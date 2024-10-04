@@ -164,6 +164,9 @@ public class Parser {
     }
     
     private ConstDecl parseConstDecl() {
+        if (getLino() == 10) {
+            System.out.println("debug");
+        }
         Token _const = checkAndAssign(TokenType.CONSTTK);
         BType bType = parseBType();
         ArrayList<ConstDef> constDefs = new ArrayList<>();
@@ -215,10 +218,12 @@ public class Parser {
             Token lBrace = checkAndAssign(TokenType.LBRACE);
             ArrayList<ConstExp> constExps = new ArrayList<>();
             ArrayList<Token> commas = new ArrayList<>();
-            constExps.add(parseConstExp());
-            while (curToken.getType() == TokenType.COMMA) {
-                commas.add(checkAndAssign(TokenType.COMMA));
+            if (curToken.getType() != TokenType.RBRACE) {
                 constExps.add(parseConstExp());
+                while (curToken.getType() == TokenType.COMMA) {
+                    commas.add(checkAndAssign(TokenType.COMMA));
+                    constExps.add(parseConstExp());
+                }
             }
             Token rBrace = checkAndAssign(TokenType.RBRACE);
             res = new ConstInitVal(getLino(), lBrace, constExps, commas, rBrace);
@@ -439,9 +444,9 @@ public class Parser {
     }
     
     private Stmt parseStmt() {
-//        if (getLino() == 24) {
-//            System.out.println("debug");
-//        }
+        if (getLino() == 24) {
+            System.out.println("debug");
+        }
         if (curToken.getType() == TokenType.IFTK) {
             return new Stmt(getLino(), parseIfStmt());
         } else if (curToken.getType() == TokenType.LBRACE) {
@@ -468,12 +473,21 @@ public class Parser {
             return new Stmt(getLino(), parseInputInt());
         } else if (curToken.getType() == TokenType.IDENFR && Objects.requireNonNull(preview(2)).getType() == TokenType.GETCHARTK) {
             return new Stmt(getLino(), parseInputChar());
-        } else if (curToken.getType() == TokenType.IDENFR && preview(1).getType() == TokenType.ASSIGN) {
-            return new Stmt(getLino(), parseAssignStmt());
-        } else {
+        } else if (curToken.getType() == TokenType.IDENFR) {
+            int oldPos = pos;
+            LVal lVal = parseLVal();
+            if (curToken.getType() == TokenType.ASSIGN) {
+                pos = oldPos;
+                curToken = tokens.get(pos);
+                return new Stmt(getLino(), parseAssignStmt());
+            }
+            pos = oldPos;
+            curToken = tokens.get(pos);
             return new Stmt(getLino(), parseExp(), checkAndAssign(TokenType.SEMICN));
-//            System.out.println("Error in parsing Statement!");
-//            return null;
+        } else {
+            // return new Stmt(getLino(), parseExp(), checkAndAssign(TokenType.SEMICN));
+            System.out.println("Error in parsing Statement!");
+            return null;
         }
     }
     
