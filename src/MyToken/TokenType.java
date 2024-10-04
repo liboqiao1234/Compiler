@@ -43,5 +43,7 @@ public enum TokenType {
     LBRACE,
     RBRACE,
     EOF,
+    BADAND,
+    BADOR,
     ERROR
 }

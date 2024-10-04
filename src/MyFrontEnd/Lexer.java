@@ -206,7 +206,9 @@ public class Lexer {
             } else {
                 MyError error = new MyError(curLineno, MyErrorType.a);
                 errors.add(error);
-                return new Token(TokenType.ERROR, curContent, curLineno);
+                Token res = new Token(TokenType.BADAND, curContent, curLineno);
+                tokens.add(res);
+                return res;
             }
         } else if (c == '|') {
             curContent += c;
@@ -220,7 +222,9 @@ public class Lexer {
             } else {
                 MyError error = new MyError(curLineno, MyErrorType.a);
                 errors.add(error);
-                return new Token(TokenType.ERROR, curContent, curLineno);
+                Token res = new Token(TokenType.BADOR, curContent, curLineno);
+                tokens.add(res);
+                return res;
             }
         } else if (c == '\'') {
             curContent += c;

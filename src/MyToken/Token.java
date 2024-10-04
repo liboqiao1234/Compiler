@@ -28,4 +28,8 @@ public class Token {
     public String toString() {
         return type.toString() + " " + content;
     }
+    
+    public void print() {
+        System.out.println(type.toString() + " " + content);
+    }
 }
