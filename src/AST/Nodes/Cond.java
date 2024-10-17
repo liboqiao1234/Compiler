@@ -11,6 +11,10 @@ public class Cond extends Node {
         this.lorExp = lorExp;
     }
     
+    public LOrExp getLOrExp() {
+        return lorExp;
+    }
+    
     public void print() {
         lorExp.print();
         super.print();

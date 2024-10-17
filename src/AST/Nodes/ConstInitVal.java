@@ -35,6 +35,14 @@ public class ConstInitVal extends Node {
         this.stringConst = stringConst;
     }
     
+    public ConstExp getConstExp() {
+        return constExp;
+    }
+    
+    public ArrayList<ConstExp> getConstExps() {
+        return constExps;
+    }
+    
     public void print() {
         if (constExp != null) {
             constExp.print();

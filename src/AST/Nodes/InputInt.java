@@ -22,6 +22,10 @@ public class InputInt extends Node {
         this.semicn = semicn;
     }
     
+    public LVal getLVal() {
+        return lVal;
+    }
+    
     public void print() {
         lVal.print();
         assign.print();

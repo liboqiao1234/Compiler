@@ -34,6 +34,22 @@ public class ForStmts extends Node {
         this.stmt = stmt;
     }
     
+    public ForStmt getForStmt1() {
+        return forStmt1;
+    }
+    
+    public ForStmt getForStmt2() {
+        return forStmt2;
+    }
+    
+    public Cond getCond() {
+        return cond;
+    }
+    
+    public Stmt getStmt() {
+        return stmt;
+    }
+    
     public void print() {
         _for.print();
         leftParen.print();

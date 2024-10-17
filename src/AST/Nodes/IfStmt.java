@@ -33,6 +33,20 @@ public class IfStmt extends Node {
         this._elseStmt = _elseStmt;
     }
     
+    public Cond getCond() {
+        return cond;
+    }
+    
+    public Stmt getStmt() {
+        return stmt;
+    }
+    
+    public Stmt getElseStmt() {
+        return _elseStmt;
+    }
+    
+    
+    
     public void print() {
         _if.print();
         leftParen.print();

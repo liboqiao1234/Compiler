@@ -11,6 +11,10 @@ public class ConstExp extends Node {
         this.addExp = node;
     }
     
+    public AddExp getAddExp() {
+        return addExp;
+    }
+    
     public void print() {
         addExp.print();
         super.print();

@@ -3,8 +3,10 @@ import AST.Nodes.ConstExp;
 import MyError.MyError;
 import MyFrontEnd.Lexer;
 import MyFrontEnd.Parser;
+import MyFrontEnd.Semanticer;
 import MyToken.Token;
 import MyToken.TokenType;
+import Symbol.SymbolTable;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
@@ -16,8 +18,20 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 
 public class Compiler {
+    private static void debugOutput(String name) {
+        try {
+            PrintStream out = new PrintStream(new FileOutputStream(name));
+            System.setOut(out);
+            System.out.println("test");
+            out.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+    
     public static void main(String[] args) {
         StringBuilder source = new StringBuilder();
         try (FileInputStream fis = new FileInputStream("testfile.txt");
@@ -44,13 +58,6 @@ public class Compiler {
             }
         } else {
             errors = lexer.getErrors();
-            try (FileOutputStream fos = new FileOutputStream("error.txt");
-                 PrintWriter writer = new PrintWriter(fos)) {
-                for (MyError error : errors)
-                    writer.println(error.toString());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
         
         Parser parser = new Parser(lexer.getTokens());
@@ -59,7 +66,7 @@ public class Compiler {
         Collections.sort(errors);
         // if (root != null) root.print();
         
-        if (errors.isEmpty()) {
+        /*if (errors.isEmpty()) {
             try {
                 PrintStream out = new PrintStream(new FileOutputStream("parser.txt"));
                 
@@ -82,8 +89,37 @@ public class Compiler {
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
+        }*/
+        Semanticer sm = new Semanticer(root);
+        debugOutput("symbol.txt");
+        debugOutput("error.txt");
+        //if (true) return ;
+        sm.check();
+        ArrayList<MyError> semanticErrors = sm.getErrors();
+        errors.addAll(semanticErrors);
+        Collections.sort(errors);
+        if (errors.isEmpty()) {
+            SymbolTable table = sm.getSymbolTable();
+            try {
+                PrintStream out = new PrintStream(new FileOutputStream("symbol.txt"));
+                System.setOut(out);
+                table.print();
+                out.close();
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+        } else {
+            try {
+                PrintStream out = new PrintStream(new FileOutputStream("error.txt"));
+                System.setOut(out);
+                for (MyError error : errors)
+                    System.out.println(error.toString());
+                out.close();
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+
         }
-        
         
     }
 }

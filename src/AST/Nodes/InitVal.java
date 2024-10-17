@@ -35,10 +35,22 @@ public class InitVal extends Node {
         this.stringConst = stringConst;
     }
     
+    public Exp getExp() {
+        return exp;
+    }
+    
+    public ArrayList<Exp> getExpList() {
+        return expList;
+    }
+    
+    public Token getStringConst() {
+        return stringConst;
+    }
+    
     public void print() {
-        if(exp != null) {
+        if (exp != null) {
             exp.print();
-        } else if(leftBracket != null) {
+        } else if (leftBracket != null) {
             leftBracket.print();
             for (int i = 0; i < expList.size(); i++) {
                 expList.get(i).print();

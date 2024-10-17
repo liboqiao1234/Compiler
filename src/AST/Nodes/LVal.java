@@ -3,6 +3,7 @@ package AST.Nodes;
 import AST.Node;
 import AST.NodeType;
 import MyToken.Token;
+import Symbol.SymbolType;
 
 public class LVal extends Node {
     private Token ident;
@@ -10,6 +11,15 @@ public class LVal extends Node {
     private Token leftBracket = null;
     private Exp exp = null;
     private Token rightBracket = null;
+    
+    public Token getIdent() {
+        return ident;
+    }
+    
+    public Exp getExp() {
+        return exp;
+    }
+    
     
     public LVal(int lino, Token ident) {
         super(lino, NodeType.LVal);

@@ -48,20 +48,38 @@ import MyError.MyErrorType;
 import MyToken.Token;
 import MyToken.TokenType;
 
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Objects;
+
+import static MyToken.TokenType.BADOR;
+import static MyToken.TokenType.CHRCON;
+import static MyToken.TokenType.CONSTTK;
+import static MyToken.TokenType.INTCON;
+import static MyToken.TokenType.STRCON;
+import static MyToken.TokenType.*;
 
 public class Parser {
     private ArrayList<Token> tokens;
     private int pos;
     private Token curToken;
     private ArrayList<MyError> errors;
+//    private final ArrayList<TokenType> debugArray;
+    
     
     public Parser(ArrayList<Token> tokens) {
         this.tokens = tokens;
         pos = 0;
         curToken = tokens.get(0); // initialize as first token;
         errors = new ArrayList<>();
+//        debugArray = new ArrayList<>(Arrays.asList(new TokenType[]{
+//
+//                GETINTTK,
+//
+//        }));
     }
     
     
@@ -81,7 +99,7 @@ public class Parser {
     }
     
     private Token checkAndAssign(TokenType type) {
-        if (curToken.getType() == type || curToken.getType() == TokenType.BADAND || curToken.getType() == TokenType.BADOR) {
+        if (curToken.getType() == type || curToken.getType() == TokenType.BADAND || curToken.getType() == BADOR) {
             Token ret = curToken;
             read();
             return ret;
@@ -107,9 +125,45 @@ public class Parser {
             if (errorType == null) {
                 System.out.println("Unknown Error Type in CheckAndAssign, should be:" + type.toString() +
                         "now at " + curToken + " at line " + getLino());
+//                if (type == IDENFR && debugArray.contains(curToken.getType())){
+//                    try {
+//                        PrintStream out = new PrintStream(new FileOutputStream("symbol.txt"));
+//                        System.setOut(out);
+//                        System.out.println("123");
+//                        out.close();
+//                        out = new PrintStream(new FileOutputStream("error.txt"));
+//                        System.out.println("123");
+//                        out.close();
+//                    } catch (FileNotFoundException e) {
+//                        e.printStackTrace();
+//                    }
+//                    System.exit(0);
+//                }
             }
 //            TODO: checkAndAssign错误处理
             errors.add(new MyError(Objects.requireNonNull(preview(-1)).getLineno(), errorType));
+            return new Token(type, content, getLino());
+        }
+    }
+    
+    private Token checkAndAssign(TokenType type, boolean raiseError) {
+        if (curToken.getType() == type || curToken.getType() == TokenType.BADAND || curToken.getType() == BADOR) {
+            Token ret = curToken;
+            read();
+            return ret;
+        } else {
+            String content = curToken.getContent();
+            switch (type) {
+                case SEMICN:
+                    content = ";";
+                    break;
+                case RPARENT:
+                    content = ")";
+                    break;
+                case RBRACK:
+                    content = "]";
+                    break;
+            }
             return new Token(type, content, getLino());
         }
         
@@ -153,7 +207,7 @@ public class Parser {
     
     private Decl parseDecl() {
         Decl res = null;
-        if (curToken.getType() == TokenType.CONSTTK) {
+        if (curToken.getType() == CONSTTK) {
             ConstDecl child = parseConstDecl();
             res = new Decl(getLino(), child);
         } else {
@@ -164,10 +218,7 @@ public class Parser {
     }
     
     private ConstDecl parseConstDecl() {
-        if (getLino() == 10) {
-            System.out.println("debug");
-        }
-        Token _const = checkAndAssign(TokenType.CONSTTK);
+        Token _const = checkAndAssign(CONSTTK);
         BType bType = parseBType();
         ArrayList<ConstDef> constDefs = new ArrayList<>();
         ArrayList<Token> commas = new ArrayList<>();
@@ -227,8 +278,8 @@ public class Parser {
             }
             Token rBrace = checkAndAssign(TokenType.RBRACE);
             res = new ConstInitVal(getLino(), lBrace, constExps, commas, rBrace);
-        } else if (curToken.getType() == TokenType.STRCON) { // stringConst
-            Token str = checkAndAssign(TokenType.STRCON);
+        } else if (curToken.getType() == STRCON) { // stringConst
+            Token str = checkAndAssign(STRCON);
             res = new ConstInitVal(getLino(), str);
         } else {
             res = new ConstInitVal(getLino(), parseConstExp());
@@ -283,7 +334,7 @@ public class Parser {
             }
             Token rBrace = checkAndAssign(TokenType.RBRACE);
             res = new InitVal(getLino(), lBrace, exps, commas, rBrace);
-        } else if (curToken.getType() == TokenType.STRCON) {
+        } else if (curToken.getType() == STRCON) {
             res = new InitVal(getLino(), curToken);
             read();
         } else {
@@ -334,7 +385,7 @@ public class Parser {
             Token ident = checkAndAssign(TokenType.IDENFR);
             Token lParen = checkAndAssign(TokenType.LPARENT);
             FuncRParams funcRParams = null;
-            if (curToken.getType() != TokenType.RPARENT) {
+            if (curToken.getType() != TokenType.RPARENT && isExp()) {
                 funcRParams = parseFuncRParams();
             }
             Token rParen = checkAndAssign(TokenType.RPARENT);
@@ -344,16 +395,22 @@ public class Parser {
         }
     }
     
+    private boolean isExp() {
+        return curToken.getType() == TokenType.PLUS || curToken.getType() == TokenType.MINU
+                || curToken.getType() == TokenType.IDENFR || curToken.getType() == INTCON
+                || curToken.getType() == TokenType.LPARENT || curToken.getType() == CHRCON;
+    }
+    
     private PrimaryExp parsePrimaryExp() {
         if (curToken.getType() == TokenType.LPARENT) {
             Token lParen = checkAndAssign(TokenType.LPARENT);
             Exp exp = parseExp();
             Token rParen = checkAndAssign(TokenType.RPARENT);
             return new PrimaryExp(getLino(), lParen, exp, rParen);
-        } else if (curToken.getType() == TokenType.INTCON) {
-            return new PrimaryExp(getLino(), new Number(getLino(), checkAndAssign(TokenType.INTCON)));
-        } else if (curToken.getType() == TokenType.CHRCON) {
-            return new PrimaryExp(getLino(), new Character(getLino(), checkAndAssign(TokenType.CHRCON)));
+        } else if (curToken.getType() == INTCON) {
+            return new PrimaryExp(getLino(), new Number(getLino(), checkAndAssign(INTCON)));
+        } else if (curToken.getType() == CHRCON) {
+            return new PrimaryExp(getLino(), new Character(getLino(), checkAndAssign(CHRCON)));
         } else {
             return new PrimaryExp(getLino(), parseLVal());
         }
@@ -368,6 +425,16 @@ public class Parser {
             return new LVal(getLino(), ident, lBracket, exp, rBracket);
         } else {
             return new LVal(getLino(), ident);
+        }
+    }
+    
+    private void preReadLVal() {
+        Token ident = checkAndAssign(TokenType.IDENFR, false);
+        if (curToken.getType() == TokenType.LBRACK) {
+            Token lBracket = checkAndAssign(TokenType.LBRACK, false);
+            Exp exp = parseExp();
+            
+            Token rBracket = checkAndAssign(TokenType.RBRACK, false);
         }
     }
     
@@ -394,7 +461,7 @@ public class Parser {
         Token ident = checkAndAssign(TokenType.IDENFR);
         Token lParen = checkAndAssign(TokenType.LPARENT);
         FuncFParams funcFParams = null;
-        if (curToken.getType() != TokenType.RPARENT)
+        if (curToken.getType() != TokenType.RPARENT && curToken.getType() != TokenType.LBRACE)
             funcFParams = parseFuncFParams();
         Token rParen = checkAndAssign(TokenType.RPARENT);
         Block block = parseBlock();
@@ -436,7 +503,7 @@ public class Parser {
     
     private BlockItem parseBlockItem() {
         if (curToken.getType() == TokenType.INTTK || curToken.getType() == TokenType.CHARTK
-                || curToken.getType() == TokenType.VOIDTK || curToken.getType() == TokenType.CONSTTK) {
+                || curToken.getType() == TokenType.VOIDTK || curToken.getType() == CONSTTK) {
             return new BlockItem(getLino(), parseDecl());
         } else {
             return new BlockItem(getLino(), parseStmt());
@@ -444,9 +511,6 @@ public class Parser {
     }
     
     private Stmt parseStmt() {
-        if (getLino() == 24) {
-            System.out.println("debug");
-        }
         if (curToken.getType() == TokenType.IFTK) {
             return new Stmt(getLino(), parseIfStmt());
         } else if (curToken.getType() == TokenType.LBRACE) {
@@ -467,16 +531,26 @@ public class Parser {
                 return new Stmt(getLino(), checkAndAssign(TokenType.SEMICN));
             }
             return new Stmt(getLino(), parseExp(), checkAndAssign(TokenType.SEMICN));
-        } else if (curToken.getType() == TokenType.IDENFR
+        } /*else if (curToken.getType() == TokenType.IDENFR
                 && Objects.requireNonNull(preview(2)).getType() == TokenType.GETINTTK
         ) {
             return new Stmt(getLino(), parseInputInt());
         } else if (curToken.getType() == TokenType.IDENFR && Objects.requireNonNull(preview(2)).getType() == TokenType.GETCHARTK) {
             return new Stmt(getLino(), parseInputChar());
-        } else if (curToken.getType() == TokenType.IDENFR) {
+        }*/ else if (curToken.getType() == TokenType.IDENFR) {
             int oldPos = pos;
-            LVal lVal = parseLVal();
+            //parseLVal();
+            preReadLVal();
             if (curToken.getType() == TokenType.ASSIGN) {
+                if (Objects.requireNonNull(preview(1)).getType() == GETINTTK) {
+                    pos = oldPos;
+                    curToken = tokens.get(pos);
+                    return new Stmt(getLino(), parseInputInt());
+                } else if (Objects.requireNonNull(preview(1)).getType() == GETCHARTK) {
+                    pos = oldPos;
+                    curToken = tokens.get(pos);
+                    return new Stmt(getLino(), parseInputChar());
+                }
                 pos = oldPos;
                 curToken = tokens.get(pos);
                 return new Stmt(getLino(), parseAssignStmt());
@@ -514,7 +588,7 @@ public class Parser {
         ArrayList<LAndExp> lAndExps = new ArrayList<>();
         ArrayList<Token> orOps = new ArrayList<>();
         lAndExps.add(parseLAndExp());
-        while (curToken.getType() == TokenType.OR || curToken.getType() == TokenType.BADOR) {
+        while (curToken.getType() == TokenType.OR || curToken.getType() == BADOR) {
             orOps.add(checkAndAssign(TokenType.OR));
             lAndExps.add(parseLAndExp());
         }
@@ -608,7 +682,7 @@ public class Parser {
     private Printf parsePrintfStmt() {
         Token _printf = checkAndAssign(TokenType.PRINTFTK);
         Token leftParen = checkAndAssign(TokenType.LPARENT);
-        Token strConst = checkAndAssign(TokenType.STRCON);
+        Token strConst = checkAndAssign(STRCON);
         ArrayList<Exp> exps = new ArrayList<>();
         ArrayList<Token> commas = new ArrayList<>();
         while (curToken.getType() == TokenType.COMMA) {

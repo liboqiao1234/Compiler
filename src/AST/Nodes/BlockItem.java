@@ -18,6 +18,14 @@ public class BlockItem extends Node {
         this.stmt = stmt;
     }
     
+    public Decl getDecl() {
+        return decl;
+    }
+    
+    public Stmt getStmt() {
+        return stmt;
+    }
+    
     public void print() {
         if (decl != null) {
             decl.print();

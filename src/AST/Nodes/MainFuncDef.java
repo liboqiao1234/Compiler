@@ -21,6 +21,10 @@ public class MainFuncDef extends Node {
         this.block = block;
     }
 
+    public Block getBlock() {
+        return block;
+    }
+    
     public void print() {
         Printer.print(_int);
         Printer.print(_main);

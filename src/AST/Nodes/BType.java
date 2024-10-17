@@ -5,6 +5,8 @@ import AST.NodeType;
 import MyToken.Token;
 import util.Printer;
 
+import java.util.Objects;
+
 public class BType extends Node {
     private Token type;
     
@@ -17,4 +19,9 @@ public class BType extends Node {
         Printer.print(type);
         // no super
     }
+    
+    public boolean equals(String comparedType) {
+        return Objects.equals(type.getContent(), comparedType);
+    }
+    
 }

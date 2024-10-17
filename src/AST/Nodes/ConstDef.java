@@ -8,7 +8,7 @@ import util.Printer;
 public class ConstDef extends Node {
     private Token ident;
     private Token leftBraket;
-    private ConstExp constExp;
+    private ConstExp constExp = null;
     private Token rightBraket;
     private Token assign;
     private ConstInitVal constInitVal;
@@ -28,6 +28,18 @@ public class ConstDef extends Node {
         this.ident = ident;
         this.assign = assign;
         this.constInitVal = constInitVal;
+    }
+    
+    public Token getIdent() {
+        return ident;
+    }
+    
+    public ConstExp getConstExp() {
+        return constExp;
+    }
+    
+    public ConstInitVal getConstInitVal() {
+        return constInitVal;
     }
     
     public void print() {

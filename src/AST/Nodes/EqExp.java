@@ -16,6 +16,10 @@ public class EqExp extends Node {
         this.eqOps = eqs;
     }
     
+    public ArrayList<RelExp> getRelExps() {
+        return relExps;
+    }
+    
     public void print() {
         for (int i = 0; i < relExps.size(); i++) {
             relExps.get(i).print();

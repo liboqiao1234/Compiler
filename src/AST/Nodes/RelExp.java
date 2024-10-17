@@ -16,6 +16,10 @@ public class RelExp extends Node {
         this.relOps = relOps;
     }
     
+    public ArrayList<AddExp> getAddExps() {
+        return addExps;
+    }
+    
     public void print() {
         for (int i = 0; i < addExps.size(); i++) {
             addExps.get(i).print();

@@ -17,6 +17,14 @@ public class ForStmt extends Node {
         
     }
     
+    public LVal getlVal() {
+        return lVal;
+    }
+    
+    public Exp getExp() {
+        return exp;
+    }
+    
     public void print() {
         lVal.print();
         assign.print();

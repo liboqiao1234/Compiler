@@ -16,6 +16,10 @@ public class FuncFParams extends Node {
         this.commas = commas;
     }
     
+    public ArrayList<FuncFParam> getFuncFParams() {
+        return funcFParams;
+    }
+    
     public void print() {
         for (int i = 0; i < funcFParams.size(); i++) {
             funcFParams.get(i).print();

@@ -23,6 +23,14 @@ public class ConstDecl extends Node {
         this.semicn = semicn;
     }
     
+    public BType getBType() {
+        return bType;
+    }
+    
+    public ArrayList<ConstDef> getConstDefs() {
+        return constDefs;
+    }
+    
     public void print() {
         Printer.print(_const);
         bType.print();

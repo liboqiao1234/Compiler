@@ -11,6 +11,10 @@ public class Exp extends Node {
         this.addExp = addExp;
     }
     
+    public AddExp getAddExp() {
+        return addExp;
+    }
+    
     public void print() {
         addExp.print();
         super.print();

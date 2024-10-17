@@ -8,6 +8,7 @@ import util.Printer;
 import java.util.ArrayList;
 
 public class UnaryExp extends Node {
+    // UnaryExp → {UnaryOp} PrimaryExp | Ident '(' [FuncRParams] ')'
     private ArrayList<UnaryOp> unaryOps;
     private PrimaryExp primaryExp;
     
@@ -40,6 +41,10 @@ public class UnaryExp extends Node {
         return ident;
     }
     
+    public FuncRParams getFuncRParams() {
+        return funcRParams;
+    }
+    
     public void print() {
         for (UnaryOp unaryOp : unaryOps) {
             unaryOp.print();
@@ -54,7 +59,7 @@ public class UnaryExp extends Node {
             }
             Printer.print(rightParen);
         }
-        for (int i = 0 ;i <unaryOps.size();i++) super.print();
+        for (int i = 0; i < unaryOps.size(); i++) super.print();
         super.print();
     }
 }

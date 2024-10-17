@@ -18,6 +18,14 @@ public class AssignStmt extends Node {
         this.semicn = semicn;
     }
     
+    public LVal getlVal() {
+        return lVal;
+    }
+    
+    public Exp getExp() {
+        return exp;
+    }
+    
     public void print() {
         lVal.print();
         System.out.println(assign.getType() + " " + assign.getContent());

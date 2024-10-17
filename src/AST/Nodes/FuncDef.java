@@ -14,6 +14,22 @@ public class FuncDef extends Node {
     private Token rightParen;
     private Block block;
     
+    public Token getIdent() {
+        return ident;
+    }
+    
+    public FuncType getFuncType() {
+        return funcType;
+    }
+    
+    public FuncFParams getFuncFParams() {
+        return funcFParams;
+    }
+    
+    public Block getBlock() {
+        return block;
+    }
+    
     public FuncDef(int lino, FuncType funcType, Token ident, Token leftParen, FuncFParams funcFParams, Token rightParen, Block block) {
         super(lino, NodeType.FuncDef);
         this.funcType = funcType;

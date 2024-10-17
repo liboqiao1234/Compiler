@@ -22,6 +22,10 @@ public class Return extends Node {
         this.semicn = semicn;
     }
     
+    public Exp getExp() {
+        return exp;
+    }
+    
     public void print() {
         _return.print();
         if (exp != null) {

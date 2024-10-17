@@ -10,7 +10,7 @@ public class Printf extends Node {
     private Token printf;
     private Token leftParen;
     private Token stringConst;
-    private ArrayList<Exp> exps;
+    private ArrayList<Exp> exps = null;
     private ArrayList<Token> commas;
     private Token rightParen;
     private Token semicn;
@@ -33,6 +33,14 @@ public class Printf extends Node {
         this.commas = commas;
         this.rightParen = rightParen;
         this.semicn = semicn;
+    }
+    
+    public String getStringConst() {
+        return stringConst.getContent();
+    }
+    
+    public ArrayList<Exp> getExps() {
+        return exps;
     }
     
     public void print() {

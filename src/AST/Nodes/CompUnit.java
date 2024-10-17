@@ -17,6 +17,18 @@ public class CompUnit extends Node {
         this.mainFuncDef = mainFuncDef;
     }
     
+    public ArrayList<Decl> getDecls() {
+        return decls;
+    }
+    
+    public ArrayList<FuncDef> getFuncDefs() {
+        return funcDefs;
+    }
+    
+    public MainFuncDef getMainFuncDef() {
+        return mainFuncDef;
+    }
+    
     public void print() {
         for (Decl decl : decls) {
             decl.print();

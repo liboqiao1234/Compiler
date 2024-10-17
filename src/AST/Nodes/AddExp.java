@@ -17,6 +17,14 @@ public class AddExp extends Node {
         this.addOps = addOps;
     }
     
+    public ArrayList<MulExp> getMulExps() {
+        return mulExps;
+    }
+    
+    public ArrayList<Token> getAddOps() {
+        return addOps;
+    }
+    
     public void print() {
         for (int i = 0; i < mulExps.size(); i++) {
             mulExps.get(i).print();

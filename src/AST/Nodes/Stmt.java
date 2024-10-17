@@ -98,6 +98,54 @@ public class Stmt extends Node {
         this.printf = printf;
     }
     
+    public AssignStmt getAssignStmt() {
+        return assignStmt;
+    }
+    
+    public Exp getExp() {
+        return exp;
+    }
+    
+    public Token getSemicn() {
+        return semicn;
+    }
+    
+    public Block getBlock() {
+        return block;
+    }
+    
+    public IfStmt getIfStmt() {
+        return ifStmt;
+    }
+    
+    public ForStmts getForStmts() {
+        return forStmts;
+    }
+    
+    public Break getBreak() {
+        return _break;
+    }
+    
+    public Continue getContinue() {
+        return _continue;
+    }
+    
+    public Return getReturn() {
+        return _return;
+    }
+    
+    public InputInt getInputInt() {
+        return inputInt;
+    }
+    
+    public InputChar getInputChar() {
+        return inputChar;
+    }
+    
+    public Printf getPrintf() {
+        return printf;
+    }
+    
     public void print() {
         if (assignStmt != null) {
             assignStmt.print();

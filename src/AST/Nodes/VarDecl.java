@@ -20,6 +20,22 @@ public class VarDecl extends Node {
         this.semicn = semicn;
     }
     
+    public BType getBType() {
+        return bType;
+    }
+    
+    public ArrayList<VarDef> getVarDefs() {
+        return varDefs;
+    }
+    
+    public ArrayList<Token> getCommas() {
+        return commas;
+    }
+    
+    public Token getSemicn() {
+        return semicn;
+    }
+    
     public void print() {
         bType.print();
         for (int i = 0; i < varDefs.size(); i++) {

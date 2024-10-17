@@ -17,6 +17,14 @@ public class Decl extends Node {
         this.varDecl = varDecl;
     }
     
+    public ConstDecl getConstDecl() {
+        return constDecl;
+    }
+    
+    public VarDecl getVarDecl() {
+        return varDecl;
+    }
+    
     public void print() {
         
         if (constDecl != null) {

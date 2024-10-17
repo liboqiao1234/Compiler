@@ -17,6 +17,10 @@ public class MulExp extends Node {
         this.operators = operators;
     }
     
+    public ArrayList<UnaryExp> getUnaryExps() {
+        return unaryExps;
+    }
+    
     public void print() {
         for (int i = 0; i < unaryExps.size(); i++) {
             unaryExps.get(i).print();

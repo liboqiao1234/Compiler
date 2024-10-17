@@ -31,6 +31,18 @@ public class VarDef extends Node {
         this.initVal = initVal;
     }
     
+    public Token getIdent() {
+        return this.Iden;
+    }
+    
+    public ConstExp getConstExp() {
+        return this.constExp;
+    }
+    
+    public InitVal getInitVal() {
+        return this.initVal;
+    }
+    
     public void print() {
         Iden.print();
         if (LeftBracket != null) {

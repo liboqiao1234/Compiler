@@ -19,6 +19,14 @@ public class Block extends Node {
         this.rightBracket = rightBracket;
     }
     
+    public ArrayList<BlockItem> getBlockItems() {
+        return blockItems;
+    }
+    
+    public Token getRightBracket() {
+        return rightBracket;
+    }
+    
     public void print() {
         Printer.print(leftBracket);
         for (BlockItem blockItem : blockItems) {

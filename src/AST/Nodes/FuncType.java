@@ -12,6 +12,10 @@ public class FuncType extends Node {
         this.type = type;
     }
     
+    public boolean equals(String comparedType) {
+        return type.getContent().equals(comparedType);
+    }
+    
     public void print() {
         type.print();
         super.print();

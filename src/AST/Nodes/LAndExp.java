@@ -16,6 +16,10 @@ public class LAndExp extends Node {
         this.ands = ands;
     }
     
+    public ArrayList<EqExp> getEqExps() {
+        return eqExps;
+    }
+    
     public void print() {
         for (int i = 0; i < eqExps.size(); i++) {
             eqExps.get(i).print();

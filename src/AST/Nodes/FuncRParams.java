@@ -16,6 +16,10 @@ public class FuncRParams extends Node {
         this.commas = commas;
     }
     
+    public ArrayList<Exp> getExps() {
+        return exps;
+    }
+    
     public void print() {
         for(int i = 0; i < exps.size(); i++) {
             exps.get(i).print();
