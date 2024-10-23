@@ -633,9 +633,11 @@ public class Parser {
         Token _return = checkAndAssign(TokenType.RETURNTK);
         if (curToken.getType() == TokenType.SEMICN) {
             return new Return(getLino(), _return, checkAndAssign(TokenType.SEMICN));
-        } else {
+        } else if(isExp()){ // return [EXP] ;
             Exp exp = parseExp();
             return new Return(getLino(), _return, exp, checkAndAssign(TokenType.SEMICN));
+        } else {
+            return new Return(getLino(), _return, checkAndAssign(TokenType.SEMICN));
         }
     }
     
