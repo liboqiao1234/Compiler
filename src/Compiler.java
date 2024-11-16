@@ -120,6 +120,14 @@ public class Compiler {
             }
 
         }
+        /*
         
+        1. TokenType增加，Lexer中保留字字典增加，
+        2. NodeType增加对应**语法成分**
+        3. Node增加相关类：属性设计、print重写（如果是自定义不输出，就不在最后加super.print())、Token包含Ident和关键字
+        4. 加常量的话记得在isExp()里面修改first对应的内容！
+        
+        
+         */
     }
 }
