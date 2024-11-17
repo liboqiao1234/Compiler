@@ -4,39 +4,39 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 
-public class SymbolTable {
+public class SymbolTable<T> {
     private boolean hasReturn; // if it is a func: check error type 'g';
     private int id; // symbol table ID, not level!
-    private LinkedHashMap<String, Symbol> table;
-    private SymbolTable father;
-    private ArrayList<SymbolTable> sons;
+    private LinkedHashMap<String, T> table;
+    private SymbolTable<T> father;
+    private ArrayList<SymbolTable<T>> sons;
     
-    public SymbolTable(SymbolTable fa, int id) {
+    public SymbolTable(SymbolTable<T> fa, int id) {
         father = fa;
         this.id = id;
-        table = new LinkedHashMap<String, Symbol>();
-        sons = new ArrayList<SymbolTable>();
+        table = new LinkedHashMap<String, T>();
+        sons = new ArrayList<SymbolTable<T>>();
         hasReturn = false;
     }
     
-    public SymbolTable(SymbolTable fa, boolean hasReturn, int id) {
+    public SymbolTable(SymbolTable<T> fa, boolean hasReturn, int id) {
         father = fa;
         this.id = id;
-        table = new LinkedHashMap<String, Symbol>();
-        sons = new ArrayList<SymbolTable>();
+        table = new LinkedHashMap<String, T>();
+        sons = new ArrayList<SymbolTable<T>>();
         this.hasReturn = hasReturn;
     }
     
-    public void insert(String name, Symbol symbol) {
-        if (contains(name)) {
+    public void insert(String name, T symbol) {
+        /*if (contains(name)) {
             System.err.println("Error: Duplicate declaration of " + name + " at line " + symbol.getLineno());
             return;
-        }
+        }*/
         // System.out.println("[DEBUG] SymTable ID " + id + ", Insert " + name + " as " + symbol.getDataType().toString());
         table.put(name, symbol);
     }
     
-    public Symbol find(String name) {
+    public T find(String name) {
         if (contains(name)) {
             return table.get(name);
         }
@@ -54,19 +54,19 @@ public class SymbolTable {
         return table.containsKey(name);
     }
     
-    public SymbolTable getFather() {
+    public SymbolTable<T> getFather() {
         return father;
     }
     
-    public SymbolTable createSon(boolean hasReturn, int id) {
-        SymbolTable son = new SymbolTable(this, hasReturn, id);
+    public SymbolTable<T> createSon(boolean hasReturn, int id) {
+        SymbolTable<T> son = new SymbolTable<T>(this, hasReturn, id);
         sons.add(son);
         return son;
     }
     
     public void print() {
         for (String name : table.keySet()) {
-            System.out.println(id + " " + name + " " + table.get(name).getDataType().toString());
+            System.out.println(id + " " + name + " " + ((Symbol)table.get(name)).getDataType().toString());
             /*if (table.get(name) instanceof FuncSymbol) {
                 ArrayList<VarSymbol> params = ((FuncSymbol) table.get(name)).getParams();
                 for (VarSymbol param : params) {

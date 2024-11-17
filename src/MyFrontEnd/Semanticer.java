@@ -1,46 +1,10 @@
 package MyFrontEnd;
 
-import AST.Nodes.AddExp;
-import AST.Nodes.AssignStmt;
-import AST.Nodes.BType;
-import AST.Nodes.Block;
-import AST.Nodes.BlockItem;
-import AST.Nodes.CompUnit;
-import AST.Nodes.Cond;
-import AST.Nodes.ConstDecl;
-import AST.Nodes.ConstDef;
-import AST.Nodes.ConstExp;
-import AST.Nodes.ConstInitVal;
-import AST.Nodes.Decl;
-import AST.Nodes.EqExp;
-import AST.Nodes.Exp;
-import AST.Nodes.ForStmt;
-import AST.Nodes.ForStmts;
-import AST.Nodes.FuncDef;
-import AST.Nodes.FuncFParam;
-import AST.Nodes.FuncFParams;
-import AST.Nodes.FuncRParams;
-import AST.Nodes.FuncType;
-import AST.Nodes.IfStmt;
-import AST.Nodes.InitVal;
-import AST.Nodes.InputChar;
-import AST.Nodes.InputInt;
-import AST.Nodes.LAndExp;
-import AST.Nodes.LOrExp;
-import AST.Nodes.LVal;
-import AST.Nodes.MainFuncDef;
-import AST.Nodes.MulExp;
-import AST.Nodes.PrimaryExp;
-import AST.Nodes.Printf;
-import AST.Nodes.RelExp;
-import AST.Nodes.Return;
-import AST.Nodes.Stmt;
-import AST.Nodes.UnaryExp;
-import AST.Nodes.VarDecl;
-import AST.Nodes.VarDef;
+import AST.Nodes.*;
 import MyError.MyError;
 import MyError.MyErrorType;
 import Symbol.FuncSymbol;
+import Symbol.Symbol;
 import Symbol.SymbolTable;
 import Symbol.SymbolType;
 import Symbol.VarSymbol;
@@ -49,17 +13,17 @@ import java.util.ArrayList;
 
 public class Semanticer {
     private CompUnit root;
-    private SymbolTable table;
+    private SymbolTable<Symbol> table;
     private ArrayList<MyError> errors;
     private int curId = 1;
     private int maxId = 1;
-    private SymbolTable curTable;
+    private SymbolTable<Symbol> curTable;
     private int hasReturn = 0; // 1: return;  2: return [something];
     private int returnLine = 0;
     
     public Semanticer(CompUnit root) {
         this.root = root;
-        this.table = new SymbolTable(null, 1);
+        this.table = new SymbolTable<Symbol>(null, 1);
         this.errors = new ArrayList<>();
         curTable = table;
     }
@@ -570,7 +534,7 @@ public class Semanticer {
         } else if (primaryExp.getCharacter() != null) {
             return SymbolType.Char;
         } else if (primaryExp.getLVal() != null) {
-            SymbolType type = curTable.find(primaryExp.getLVal().getIdent().getContent()).getDataType();
+            SymbolType type =((Symbol) curTable.find(primaryExp.getLVal().getIdent().getContent())).getDataType();
             if (primaryExp.getLVal().getExp() == null && typeIsArray(type)) {
                 return type;
             } else {
@@ -600,7 +564,7 @@ public class Semanticer {
         }
     }
     
-    public SymbolTable getSymbolTable() {
+    public SymbolTable<Symbol> getSymbolTable() {
         return table;
     }
     

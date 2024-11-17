@@ -6,6 +6,7 @@ import MyFrontEnd.Parser;
 import MyFrontEnd.Semanticer;
 import MyToken.Token;
 import MyToken.TokenType;
+import Symbol.Symbol;
 import Symbol.SymbolTable;
 
 import java.io.BufferedReader;
@@ -99,7 +100,7 @@ public class Compiler {
         errors.addAll(semanticErrors);
         Collections.sort(errors);
         if (errors.isEmpty()) {
-            SymbolTable table = sm.getSymbolTable();
+            SymbolTable<Symbol> table = sm.getSymbolTable();
             try {
                 PrintStream out = new PrintStream(new FileOutputStream("symbol.txt"));
                 System.setOut(out);
