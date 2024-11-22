@@ -63,6 +63,12 @@ public class SymbolTable<T> {
         sons.add(son);
         return son;
     }
+
+    public SymbolTable<T> createSon() {
+        SymbolTable<T> son = new SymbolTable<T>(this, false, 0);
+        sons.add(son);
+        return son;
+    }
     
     public void print() {
         for (String name : table.keySet()) {

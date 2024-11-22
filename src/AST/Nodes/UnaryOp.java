@@ -12,6 +12,10 @@ public class UnaryOp extends Node {
         super(lino, NodeType.UnaryOp);
         this.op = op;
     }
+
+    public Token getOp() {
+        return op;
+    }
     
     public void print() {
         Printer.print(op);

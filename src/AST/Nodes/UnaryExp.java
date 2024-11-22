@@ -44,6 +44,10 @@ public class UnaryExp extends Node {
     public FuncRParams getFuncRParams() {
         return funcRParams;
     }
+
+    public ArrayList<UnaryOp> getUnaryOps() {
+        return unaryOps;
+    }
     
     public void print() {
         for (UnaryOp unaryOp : unaryOps) {

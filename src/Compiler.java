@@ -1,5 +1,6 @@
 import AST.Nodes.CompUnit;
 import AST.Nodes.ConstExp;
+import IR.IRgenerator;
 import MyError.MyError;
 import MyFrontEnd.Lexer;
 import MyFrontEnd.Parser;
@@ -120,6 +121,19 @@ public class Compiler {
                 e.printStackTrace();
             }
 
+        }
+
+        IRgenerator iRgenerator = IRgenerator.getInstance();
+        iRgenerator.generateIR(root);
+        String LLVM_IR = iRgenerator.output();
+
+        try {
+            PrintStream out = new PrintStream(new FileOutputStream("llvm_ir.txt"));
+            System.setOut(out);
+            System.out.println(LLVM_IR);
+            out.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
         }
         /*
         

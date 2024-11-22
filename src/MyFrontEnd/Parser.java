@@ -642,9 +642,6 @@ public class Parser {
     }
     
     private ForStmts parseForStmts() {
-        if (getLino() == 11) {
-            System.out.println("ForStmts");
-        }
         Token _for = checkAndAssign(TokenType.FORTK);
         Token leftParen = checkAndAssign(TokenType.LPARENT);
         ForStmt stmt1 = null;

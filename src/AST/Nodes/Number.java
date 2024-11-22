@@ -11,6 +11,10 @@ public class Number extends Node {
         super(lino, NodeType.Number);
         this.num = num;
     }
+
+    public int getNum() {
+        return Integer.parseInt(num.getContent());
+    }
     
     public void print() {
         num.print();

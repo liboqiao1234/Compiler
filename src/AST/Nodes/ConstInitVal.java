@@ -42,6 +42,10 @@ public class ConstInitVal extends Node {
     public ArrayList<ConstExp> getConstExps() {
         return constExps;
     }
+
+    public Token getStringConst() {
+        return stringConst;
+    }
     
     public void print() {
         if (constExp != null) {

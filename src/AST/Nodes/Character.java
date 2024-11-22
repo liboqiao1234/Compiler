@@ -11,7 +11,11 @@ public class Character extends Node {
         super(lineno, NodeType.Character);
         this.charConst = charConst;
     }
-    
+
+    public char getCharConst() {
+        return charConst.getContent().charAt(0); // TODO: check
+    }
+
     public void print() {
         charConst.print();
         super.print();
