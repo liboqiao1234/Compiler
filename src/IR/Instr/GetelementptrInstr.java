@@ -40,9 +40,9 @@ public class GetelementptrInstr extends Instruction {
             sb.append(getName()).append(" = ");
         }
         // TODO: check the usage of inbound
-        sb. append("getelementptr inbounds (").append(arrayType).append(", ");
+        sb. append("getelementptr inbounds ").append(arrayType).append(", ");
         sb.append(array.getType()).append(" ").append(array.getName()).append(", ").append(elementType).append(" 0, ");
-        sb.append(offset.getType()).append(" ").append(offset.getName()).append(")");
+        sb.append(offset.getType()).append(" ").append(offset.getName());
         return sb.toString();
     }
 }

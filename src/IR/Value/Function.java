@@ -70,12 +70,18 @@ public class Function extends Value {
         sb.append("\ndefine dso_local ").append(getType().toString()).append(" ");
         sb.append(getName()).append("(");
         if (paraList != null) {
-            sb.append(paraList.stream().map(IRType::toString).collect(Collectors.joining(", ")));
+            for (int i = 0;i<paraList.size();i++) {
+                sb.append(paraList.get(i).toString()).append(" %").append(i);
+                if (i != paraList.size() - 1) {
+                    sb.append(", ");
+                }
+            }
         }
         sb.append(") {\n");
         for (BasicBlock block : blocks) {
-            sb.append(block.toString()).append("\n");
+            sb.append(block.toString());
         }
+
         sb.append("}");
         return sb.toString();
     }

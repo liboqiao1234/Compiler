@@ -19,6 +19,10 @@ public class Value {
         this.userList = new ArrayList<>();
     }
 
+    public void updateType(IRType type) {
+        this.type = type;
+    }
+
     public int getId() {
         return id;
     }

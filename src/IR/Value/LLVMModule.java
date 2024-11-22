@@ -5,13 +5,13 @@ import IR.Type.PointerType;
 
 import java.util.ArrayList;
 
-public class Module {
+public class LLVMModule {
     private ArrayList<GlobalVariable> globalVariables;
     private ArrayList<StringLiteral> stringLiterals;
     private ArrayList<Function> functions;
     private ArrayList<Function> declareFunctions;
 
-    public Module() {
+    public LLVMModule() {
         this.globalVariables = new ArrayList<>();
         this.stringLiterals = new ArrayList<>();
         this.functions = new ArrayList<>();

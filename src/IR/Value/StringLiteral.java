@@ -11,7 +11,11 @@ public class StringLiteral extends ConstValue {
     public StringLiteral(String value) {
         super("@str." + (++count), new PointerType(new ArrayType(IntType.I8, value.length() + 1)));
         // TODO: check: value转换为IR stringLit格式;
-        this.value = value.replace("\n","\\0a") + "\\00";
+        // \n 从两个长度变成了 \0A 三个长度，另外增加了3长度的\00，因此\n的数量： t = (afterlen - 3 - tmplen)，所以真正长度是afterlen - 2 - 2*t
+
+        this.value = value.replace("\\n", "\\0A") + "\\00";
+        int realLen = this.value.length() - 2 - 2 * (this.value.length() - 3 - value.length());
+        updateType(new PointerType(new ArrayType(IntType.I8, realLen)));
     }
 
     public String getValue() {

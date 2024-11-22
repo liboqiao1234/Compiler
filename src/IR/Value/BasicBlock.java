@@ -7,6 +7,7 @@ import java.util.ArrayList;
 public class BasicBlock extends Value{
     private ArrayList<Instruction> instructions = new ArrayList<>();
     private Function function;
+    private Instruction terminator;
 
     public BasicBlock(String name, Function function) {
         super(name, new BlockType()); // name:  "reg_num:"
@@ -24,6 +25,14 @@ public class BasicBlock extends Value{
 
     public ArrayList<Instruction> getInstructions() {
         return instructions;
+    }
+
+    public Instruction getTerminator() {
+        return terminator;
+    }
+
+    public void setTerminator(Instruction terminator) {
+        this.terminator = terminator;
     }
 
     @Override

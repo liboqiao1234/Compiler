@@ -24,7 +24,7 @@ import java.util.Collections;
 public class IRgenerator {
     private static IRgenerator instance = new IRgenerator();
     private int reg_num = -1;
-    private Module module = new Module();
+    private LLVMModule module = new LLVMModule();
     private SymbolTable<Value> curSymTable = new SymbolTable<Value>(null, 1);
     private SymbolTable<ConstValue> constSymTable = new SymbolTable<ConstValue>(null, 1);
 
@@ -160,11 +160,13 @@ public class IRgenerator {
                      ArrayList<Value> initVals = visitInitVal(varDef.getInitVal(), null);
                      ArrayList<ConstValue> constInits = new ArrayList<>();
                      for (Value i : initVals) {
-                         constInits.add((ConstValue) i);
+                         int val = ((ConstInt) i).getValue();
+                         constInits.add(new ConstInt(val, type));
+//                         constInits.add((ConstValue) i);
                      }
                     gv = new GlobalVariable(name, arrayType, new ConstArray(constInits, size));
                 } else {
-                    gv = new GlobalVariable(name, arrayType);
+                    gv = new GlobalVariable(name, arrayType, new Zeroinitializer());
                 }
 
                 //...
@@ -176,7 +178,7 @@ public class IRgenerator {
                     ConstValue initVal = (ConstValue) visitInitVal(varDef.getInitVal(), null).get(0);
                     gv = new GlobalVariable(name, type, initVal);
                 } else {
-                    gv = new GlobalVariable(name, type);
+                    gv = new GlobalVariable(name, type, new ConstInt(0,type));
                 }
                 curSymTable.insert(name, gv);
                 module.addGlobalVariable(gv);
@@ -227,9 +229,13 @@ public class IRgenerator {
             initVals.add(visitExp(initVal.getExp(), isConst, bb));
         } else if (initVal.getStringConst() != null) {
             String string = initVal.getStringConst().getContent();
-            StringLiteral sl = new StringLiteral(string);
-            module.addStringLiteral(sl);
-            initVals.add(sl);
+            string = string.substring(1, string.length()-1);
+//            StringLiteral sl = new StringLiteral(string);
+//            module.addStringLiteral(sl);
+//            initVals.add(sl);
+            for (int i = 0; i < string.length(); i++) {
+                initVals.add(new ConstInt(string.charAt(i), IntType.I8));
+            }
         } else {
             // exps for array
             for (Exp exp : initVal.getExpList()) {
@@ -299,6 +305,7 @@ public class IRgenerator {
             return new ConstInt(visitConstExp(constInitVal.getConstExp()));
         } else if (constInitVal.getStringConst() != null) {
             String str = constInitVal.getStringConst().getContent();
+            str = str.substring(1, str.length() - 1);
             ArrayList<ConstValue> constValues = new ArrayList<>();
             // 这里其实就是一个i8的数组
             for (int i = 0; i < str.length(); i++) {
@@ -423,8 +430,12 @@ public class IRgenerator {
             Value res;
             if (unaryExp.getPrimaryExp() != null) {
                 res = visitPrimaryExp(unaryExp.getPrimaryExp(), false, bb);
+                if (res.getType() == IntType.I8) {
+                    res = new ZextInstr("%" + (++reg_num), res, new Value("",IntType.I32), bb);
+                    bb.addInstr((ZextInstr) res);
+                }
             } else if (unaryExp.getIdent() != null) {
-                // function call
+                // function call; func call
                 Function func = (Function) curSymTable.find(unaryExp.getIdent().getContent());
                 IRType retType = ((FunctionType) func.getType()).getRetType();
                 if (unaryExp.getFuncRParams() != null) {
@@ -477,6 +488,11 @@ public class IRgenerator {
     }
 
     private Value visitPrimaryExp(PrimaryExp primaryExp, boolean isConst, BasicBlock bb) {
+        return visitPrimaryExp(primaryExp, isConst, bb, IntType.I32);
+        停在这里，因为char函数会返回i8，没必要转到32再转回来，因此设置needType，遇到i32计算再放大。
+    }
+
+    private Value visitPrimaryExp(PrimaryExp primaryExp, boolean isConst, BasicBlock bb, IRType needType) {
         // PrimaryExp → '(' Exp ')' | LVal | Number | Character
         if (isConst) {
             int res = 0;
@@ -617,7 +633,10 @@ public class IRgenerator {
         }
 
         visitBlock(funcDef.getBlock(), func, bb, false);
-
+        if (bb.getTerminator() == null) {
+            ReturnInstr retInstr = new ReturnInstr(bb);
+            bb.addInstr(retInstr);
+        }
         module.addFunction(func);
         exitSonTable();
     }
@@ -669,12 +688,20 @@ public class IRgenerator {
         } else if (stmt.getReturn() != null) {
             if (stmt.getReturn().getExp() != null) {
                 // return [exp];
-                Value ret = visitExp(stmt.getReturn().getExp(), false, bb);
+                Value ret = visitExp(stmt.getReturn().getExp(), false, bb); // i32
+                if (ret.getType() != ((FunctionType)func.getType()).getRetType()) {
+                    TruncInstr truncInstr = new TruncInstr("%" + (++reg_num), ret, new Value("",IntType.I8), bb);
+                    bb.addInstr(truncInstr);
+                    ret = truncInstr;
+                }
                 ReturnInstr retInstr = new ReturnInstr(ret, bb);
                 bb.addInstr(retInstr);
+                bb.setTerminator(retInstr);
             } else {
                 ReturnInstr retInstr = new ReturnInstr(bb);
                 bb.addInstr(retInstr);
+                bb.setTerminator(retInstr);
+
                 // return;
             }
         } else if (stmt.getInputChar() != null) {
@@ -728,16 +755,23 @@ public class IRgenerator {
                         bb.addInstr(callInstr);
                     } else {
                         Value expvalue = visitExp(printf.getExps().get(exp_cnt), false, bb);
-                        ZextInstr zextInstr = new ZextInstr("%" + (++reg_num), expvalue, new Value("", IntType.I32), bb);
-                        bb.addInstr(zextInstr);
-                        CallInstr callInstr = new CallInstr((Function) curSymTable.find("putch"), bb, new ArrayList<Value>(Collections.singletonList(zextInstr)));
+//                        ZextInstr zextInstr = new ZextInstr("%" + (++reg_num), expvalue, new Value("", IntType.I32), bb);
+//                        bb.addInstr(zextInstr);
+                        CallInstr callInstr = new CallInstr((Function) curSymTable.find("putch"), bb, new ArrayList<Value>(Collections.singletonList(expvalue)));
                         bb.addInstr(callInstr);
                     }
                     exp_cnt++;
                 }
             }
         }
-        ArrayList<Exp> exps = printf.getExps();
+
+        String strLit = str.substring(begin);
+        StringLiteral stringLiteral = new StringLiteral(strLit);
+        module.addStringLiteral(stringLiteral);
+        GetelementptrInstr ptrInstr = new GetelementptrInstr("%"+(++reg_num),stringLiteral, new ConstInt(0), bb);
+        bb.addInstr(ptrInstr);
+        CallInstr callInstr = new CallInstr((Function) curSymTable.find("putstr"), bb, new ArrayList<Value>(Collections.singletonList(ptrInstr)));
+        bb.addInstr(callInstr);
     }
 
 }
