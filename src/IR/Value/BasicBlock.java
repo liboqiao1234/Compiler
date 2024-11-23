@@ -35,6 +35,10 @@ public class BasicBlock extends Value{
         this.terminator = terminator;
     }
 
+    public Function getFunction() {
+        return function;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();

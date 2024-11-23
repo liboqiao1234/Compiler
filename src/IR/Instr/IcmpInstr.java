@@ -10,7 +10,7 @@ public class IcmpInstr extends Instruction {
     Operator cmp;
 
     public IcmpInstr(Operator cmp, String name, Value left, Value right, BasicBlock bb) {
-        super(IntType.I1, Operator.ICMP, bb);
+        super(IntType.I1, Operator.ICMP, bb, name);
         this.cmp = cmp;
         addArgument(left);
         addArgument(right);

@@ -31,6 +31,10 @@ public class Value {
         return name;
     }
 
+    public void setName(String newName) {
+        this.name = newName;
+    }
+
     public IRType getType() {
         return type;
     }

@@ -255,7 +255,7 @@ public class IRgenerator {
         return visitInitVal(initVal, IntType.I32);
     }
 
-    private ArrayList<Value> visitInitVal(InitVal initVal,  IRType needType) {
+    private ArrayList<Value> visitInitVal(InitVal initVal, IRType needType) {
         // InitVal → Exp | '{' [ Exp { ',' Exp } ] '}' | StringConst
         // 返回值为最终计算好初值的%i 的list，如果是单个变量，则取0号位
         ArrayList<Value> initVals = new ArrayList<>();
@@ -698,8 +698,12 @@ public class IRgenerator {
 
 
         createSonTable();
-        curbb = func.getFirstBlock();
+        BasicBlock bb = func.getFirstBlock();
+        curbb = bb;
         visitBlock(mainFuncDef.getBlock(), func, false);
+        if (curbb != bb) {
+            func.addBlock(curbb);
+        }
         module.addFunction(func);
         exitSonTable();
     }
@@ -761,6 +765,9 @@ public class IRgenerator {
         if (bb.getTerminator() == null) {
             ReturnInstr retInstr = new ReturnInstr(curbb);
             curbb.addInstr(retInstr);
+        }
+        if (curbb != bb) {
+            func.addBlock(curbb);
         }
         module.addFunction(func);
         exitSonTable();
@@ -861,23 +868,117 @@ public class IRgenerator {
         }
     }
 
+    private Value visitEqExp(EqExp eqExp) {
+        return testValueNeedToBeDeleted;
+    }
+
+    private void visitLAndExp(LAndExp lAndExp, BasicBlock trueBB, BasicBlock falseBB) {
+        // AND: 一旦失败直接到传进来的false，成功了也到next，直到最后一次：成功true，失败false
+        Value res = null;
+        for (int i = 0; i < lAndExp.getEqExps().size(); i++) {
+            EqExp eqExp = lAndExp.getEqExps().get(i);
+            Value value = visitEqExp(eqExp);
+            if (i != lAndExp.getEqExps().size() - 1) {
+                BasicBlock nextBB = new BasicBlock((++reg_num) + "", curbb.getFunction());
+                BrInstr brInstr = new BrInstr(curbb, value, nextBB, falseBB);
+                curbb.addInstr(brInstr);
+                curbb.setTerminator(brInstr);
+                curbb.getFunction().addBlock(curbb);
+                curbb = nextBB;
+            } else {
+                BrInstr brInstr = new BrInstr(curbb, value, trueBB, falseBB);
+                curbb.addInstr(brInstr);
+                curbb.setTerminator(brInstr);
+                //TODO check是否需要在这里更换 curbb
+            }
+        }
+        //assert res != null;
+        return;
+    }
+
+    private void visitLOrExp(LOrExp lorExp, BasicBlock trueBB, BasicBlock falseBB) {
+        // OR: 失败了到next，一旦成功直接true
+        // 如何做到 短路求值？ 假如 if (1-1)呢？ => 正常判断即可
+        // or 为真（显式声明const能直接出 or 增加一个判断语句）时，直接停止   a || b && c ==>  if (a)
+        for (int i = 0; i < lorExp.getLAndExps().size(); i++) {
+            LAndExp lAndExp = lorExp.getLAndExps().get(i);
+            BasicBlock nextBB = new BasicBlock("", curbb.getFunction());
+            // 传参时应该注意： 前面几次and：成功true，失败next，最后一次and：成功true，失败false
+            if (i != lorExp.getLAndExps().size() - 1) {
+                visitLAndExp(lAndExp, trueBB, nextBB);
+                nextBB.setName((++reg_num) +"");
+                //BrInstr brInstr = new BrInstr(curbb, value, trueBB, nextBB); 这个相当于在最后一个and结束时候加了
+                //curbb.addInstr(brInstr);
+                //curbb.setTerminator(brInstr);
+                curbb.getFunction().addBlock(curbb);
+                curbb = nextBB;
+            } else {
+                visitLAndExp(lAndExp, trueBB, falseBB);
+                //BrInstr brInstr = new BrInstr(curbb, value, trueBB, falseBB);
+                //curbb.addInstr(brInstr);
+                //curbb.setTerminator(brInstr);
+                //TODO check是否需要在这里更换 curbb
+            }
+
+        }
+
+    }
+
+    private void visitCond(Cond cond, BasicBlock trueBB, BasicBlock falseBB) {
+        // IRType needType = IntType.I1;
+        LOrExp lorExp = cond.getLOrExp();
+        visitLOrExp(lorExp, trueBB, falseBB);
+        // IcmpInstr icmpInstr = new IcmpInstr(Operator.ne,"%" + (++reg_num), res, new ConstInt(0, needType), curbb);
+        // curbb.addInstr(icmpInstr);
+
+    }
+
     private void visitIfStmt(IfStmt ifStmt, Function func) {
-//        Value cond = visitCond(ifStmt.getCond(), false, IntType.I1);
-//
-//        BasicBlock trueBB = new BasicBlock((++reg_num) + "", func);
-//        BasicBlock nextBB = new BasicBlock((++reg_num) + "", func);
-//        if (ifStmt.getElseStmt() != null) {
-//            BasicBlock falseBB = new BasicBlock((++reg_num) + "", func);
-//            BrInstr brInstr = new BrInstr(curbb, cond, trueBB, falseBB);
-//            curbb.addInstr(brInstr);
-//            visitStmt(ifStmt.getStmt(), func);
-//            trueBB.addInstr(new BrInstr(trueBB, nextBB));
-//            visitStmt(ifStmt.getElseStmt(), func);
-//            falseBB.addInstr(new BrInstr(falseBB, nextBB));
-//        } else {
-//            BrInstr brInstr = new BrInstr(curbb, cond, trueBB, nextBB);
-//            curbb.addInstr(brInstr);
-//        }
+        BasicBlock befBB = curbb; // backup
+        BasicBlock trueBB = new BasicBlock("", func);
+        BasicBlock nextBB;
+        //Value cond ;
+        if (ifStmt.getElseStmt() != null) {
+            BasicBlock falseBB = new BasicBlock("", func); // TODO: need to reset name
+            visitCond(ifStmt.getCond(), trueBB, falseBB);
+
+            //BrInstr brInstr = new BrInstr(befBB, cond, trueBB, falseBB);
+            //befBB.addInstr(brInstr);
+            //befBB.setTerminator(brInstr);
+            func.addBlock(curbb);
+            curbb = trueBB;
+            trueBB.setName((++reg_num)+"");
+            visitStmt(ifStmt.getStmt(), func);// trueBB遍历
+            nextBB = new BasicBlock( "", func);
+            BrInstr true2next = new BrInstr(trueBB, nextBB);
+            trueBB.addInstr(true2next);
+            trueBB.setTerminator(true2next);
+            func.addBlock(trueBB);
+            curbb = falseBB; // falseBB遍历
+            falseBB.setName((++reg_num) + "");
+            visitStmt(ifStmt.getElseStmt(), func);
+            BrInstr false2next = new BrInstr(falseBB, nextBB);
+            falseBB.addInstr(false2next);
+            falseBB.setTerminator(false2next);
+            func.addBlock(falseBB);
+        } else {
+            nextBB = new BasicBlock("", func);
+            visitCond(ifStmt.getCond(), trueBB, nextBB);
+            /*BrInstr brInstr = new BrInstr(befBB, cond, trueBB, nextBB);
+            befBB.addInstr(brInstr);  从 befBB 到 trueBB or falseBB 在cond里生成
+            befBB.setTerminator(brInstr);
+            func.addBlock(befBB);*/
+            func.addBlock(curbb);
+            curbb = trueBB;
+            trueBB.setName((++reg_num)+"");
+            visitStmt(ifStmt.getStmt(), func);// trueBB遍历
+            BrInstr true2next = new BrInstr(trueBB, nextBB);
+            trueBB.addInstr(true2next);
+            trueBB.setTerminator(true2next);
+            func.addBlock(trueBB);
+        }
+        curbb = nextBB; // nextBB继续
+        nextBB.setName(""+(++reg_num));
     }
 
     private void visitPrintf(Printf printf) {
