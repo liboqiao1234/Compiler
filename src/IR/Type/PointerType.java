@@ -13,6 +13,13 @@ public class PointerType extends IRType {
     }
 
     @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof PointerType)
+            return pointeeType.equals(((PointerType) obj).getPointeeType());
+        return false;
+    }
+
+    @Override
     public String toString() {
         return pointeeType.toString() + "*";
     }

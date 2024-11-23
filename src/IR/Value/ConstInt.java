@@ -17,7 +17,7 @@ public class ConstInt extends ConstValue {
     }
 
     public ConstInt(char ch) {
-        super(String.valueOf(ch), IntType.I8);
+        super(String.valueOf(new Integer(ch)), IntType.I8);
         this.value = (int) ch;
     }
 

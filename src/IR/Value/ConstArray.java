@@ -19,6 +19,16 @@ public class ConstArray extends ConstValue {
         }
     }
 
+    public ConstArray(IRType elementType, int length) {
+        super("", new ArrayType(elementType, length));
+        this.elementType = elementType;
+        elements = new ArrayList<>();
+        for (int i = 0; i < length; i++) {
+            elements.add(new ConstInt(0, elementType));
+        }
+    }
+
+
 
     public ArrayList<ConstValue> getElements() {
         return elements;
