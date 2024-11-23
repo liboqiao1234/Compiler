@@ -23,6 +23,7 @@ public class BrInstr extends Instruction {
     }
 
     public BrInstr(BasicBlock block, Value cond, BasicBlock ifTrue, BasicBlock ifFalse) {
+        // value should be I1
         super(IntType.VOID, Operator.BR, block);
         this.cond = cond;
         this.ifTrue = ifTrue;
@@ -31,9 +32,9 @@ public class BrInstr extends Instruction {
 
     public String toString() {
         if (cond == null) {
-            return "br label " + next.getName();
+            return "br label %" + next.getName();
         } else {
-            return "br i1 " + cond + ", label " + ifTrue + ", label " + ifFalse;
+            return "br i1 " + cond.getName() + ", label %" + ifTrue.getName() + ", label %" + ifFalse.getName();
         }
     }
 }

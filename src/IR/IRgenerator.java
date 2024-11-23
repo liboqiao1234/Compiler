@@ -9,6 +9,7 @@ import IR.Instr.LoadInstr;
 import IR.Instr.Operator;
 import IR.Instr.StoreInstr;
 import IR.Instr.CalcInstr;
+import IR.Instr.Terminators.BrInstr;
 import IR.Instr.Terminators.ReturnInstr;
 import IR.Instr.TruncInstr;
 import IR.Instr.ZextInstr;
@@ -25,6 +26,7 @@ import java.util.Objects;
 public class IRgenerator {
     private static IRgenerator instance = new IRgenerator();
     private int reg_num = -1;
+    private int bb_num = -1;
     private LLVMModule module = new LLVMModule();
     private SymbolTable<Value> curSymTable = new SymbolTable<Value>(null, 1);
     private SymbolTable<ConstValue> constSymTable = new SymbolTable<ConstValue>(null, 1);
@@ -34,6 +36,7 @@ public class IRgenerator {
     }
 
     private Value testValueNeedToBeDeleted = new Value("ERROR!", new IRType());
+    private BasicBlock curbb;
 
     private IRgenerator() {
 
@@ -66,7 +69,7 @@ public class IRgenerator {
         }
     }
 
-    private Value Convert(Value value, IRType type, BasicBlock bb) {
+    private Value Convert(Value value, IRType type) {
         if (value == null) {
             return null;
         }
@@ -76,20 +79,20 @@ public class IRgenerator {
         // func call : para is array[]
         if (type.isPointer() && value.getType().isPointer() && ((PointerType) value.getType()).getPointeeType().isArray()) {
             System.out.println("func call : para is array[]");
-            GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), value, new ConstInt(0), bb);
-            bb.addInstr(ptrInstr);
+            GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), value, new ConstInt(0), curbb);
+            curbb.addInstr(ptrInstr);
             return ptrInstr;
         }
 
         if (value.getType() == IntType.I32) {
             // then type must be I8
-            TruncInstr truncInstr = new TruncInstr("%" + (++reg_num), value, new Value("", type), bb);
-            bb.addInstr(truncInstr);
+            TruncInstr truncInstr = new TruncInstr("%" + (++reg_num), value, new Value("", type), curbb);
+            curbb.addInstr(truncInstr);
             return truncInstr;
         } else {
             // then type must be I32
-            ZextInstr zextInstr = new ZextInstr("%" + (++reg_num), value, new Value("", type), bb);
-            bb.addInstr(zextInstr);
+            ZextInstr zextInstr = new ZextInstr("%" + (++reg_num), value, new Value("", type), curbb);
+            curbb.addInstr(zextInstr);
             return zextInstr;
         }
     }
@@ -148,7 +151,7 @@ public class IRgenerator {
 
 
         for (Decl decl : root.getDecls()) {
-            visitDecl(decl, null);
+            visitDecl(decl);
         }
 
         for (FuncDef funcDef : root.getFuncDefs()) {
@@ -157,25 +160,25 @@ public class IRgenerator {
         visitMainFuncDef(root.getMainFuncDef());
     }
 
-    private void visitDecl(Decl decl, BasicBlock bb) {
+    private void visitDecl(Decl decl) {
         // ConstDecl | VarDecl;
         if (decl.getConstDecl() != null) {
-            visitConstDecl(decl.getConstDecl(), bb);
+            visitConstDecl(decl.getConstDecl());
         } else {
-            visitVarDecl(decl.getVarDecl(), bb);
+            visitVarDecl(decl.getVarDecl());
         }
     }
 
-    private void visitVarDecl(VarDecl varDecl, BasicBlock bb) {
+    private void visitVarDecl(VarDecl varDecl) {
         //  VarDecl → BType VarDef { ',' VarDef } ';'
-        boolean isGlobal = bb == null; // 如果bb是空，说明不在块内，全局；否则一定为局部。
+        boolean isGlobal = curbb == null; // 如果bb是空，说明不在块内，全局；否则一定为局部。
         IRType type = BType2IRType(varDecl.getBType());
         for (VarDef varDef : varDecl.getVarDefs()) {
-            visitVarDef(varDef, type, isGlobal, bb);
+            visitVarDef(varDef, type, isGlobal);
         }
     }
 
-    private void visitVarDef(VarDef varDef, IRType type, boolean isGlobal, BasicBlock bb) {
+    private void visitVarDef(VarDef varDef, IRType type, boolean isGlobal) {
         //  VarDef → Ident [ '[' ConstExp ']' ] | Ident [ '[' ConstExp ']' ] '=' InitVal
         String name = varDef.getIdent().getContent();
         if (isGlobal) {
@@ -186,7 +189,7 @@ public class IRgenerator {
                 ArrayType arrayType = new ArrayType(type, size);
                 GlobalVariable gv;
                 if (varDef.getInitVal() != null) {
-                    ArrayList<Value> initVals = visitInitVal(varDef.getInitVal(), null, type);
+                    ArrayList<Value> initVals = visitInitVal(varDef.getInitVal(), type);
                     ArrayList<ConstValue> constInits = new ArrayList<>();
                     for (Value i : initVals) {
                         int val = ((ConstInt) i).getValue();
@@ -205,7 +208,7 @@ public class IRgenerator {
                 // 全局变量
                 GlobalVariable gv;
                 if (varDef.getInitVal() != null) {
-                    ConstValue initVal = (ConstValue) visitInitVal(varDef.getInitVal(), null, type).get(0);
+                    ConstValue initVal = (ConstValue) visitInitVal(varDef.getInitVal(), type).get(0);
                     gv = new GlobalVariable(name, type, initVal);
                 } else {
                     gv = new GlobalVariable(name, type, new ConstInt(0, type));
@@ -218,49 +221,49 @@ public class IRgenerator {
                 // 局部数组
                 int size = visitConstExp(varDef.getConstExp());
                 ArrayType arrayType = new ArrayType(type, size);
-                AllocaInstr alloca = new AllocaInstr("%" + (++reg_num), arrayType, bb);//得到一个指向数组的指针
-                bb.addInstr(alloca);
+                AllocaInstr alloca = new AllocaInstr("%" + (++reg_num), arrayType, curbb);//得到一个指向数组的指针
+                curbb.addInstr(alloca);
                 curSymTable.insert(name, alloca);
 
                 if (varDef.getInitVal() != null) {
                     // 有初值，在这里赋值
-                    ArrayList<Value> initVals = visitInitVal(varDef.getInitVal(), bb, type);
+                    ArrayList<Value> initVals = visitInitVal(varDef.getInitVal(), type);
                     for (int i = 0; i < initVals.size(); i++) {
-                        GetelementptrInstr ptr = new GetelementptrInstr("%" + (++reg_num), alloca, new ConstInt(i), bb);
-                        StoreInstr storeInstr = new StoreInstr(initVals.get(i), ptr, bb);
-                        bb.addInstr(ptr);
-                        bb.addInstr(storeInstr);
+                        GetelementptrInstr ptr = new GetelementptrInstr("%" + (++reg_num), alloca, new ConstInt(i), curbb);
+                        StoreInstr storeInstr = new StoreInstr(initVals.get(i), ptr, curbb);
+                        curbb.addInstr(ptr);
+                        curbb.addInstr(storeInstr);
                     }
 //                    dflaskj;
                 }
             } else {
                 // 局部变量
-                AllocaInstr alloca = new AllocaInstr("%" + (++reg_num), type, bb);
-                bb.addInstr(alloca);
+                AllocaInstr alloca = new AllocaInstr("%" + (++reg_num), type, curbb);
+                curbb.addInstr(alloca);
                 curSymTable.insert(name, alloca);
                 if (varDef.getInitVal() != null) {
-                    Value initVal = visitInitVal(varDef.getInitVal(), bb, type).get(0);
-                    StoreInstr storeInstr = new StoreInstr(initVal, alloca, bb);
-                    bb.addInstr(storeInstr);
+                    Value initVal = visitInitVal(varDef.getInitVal(), type).get(0);
+                    StoreInstr storeInstr = new StoreInstr(initVal, alloca, curbb);
+                    curbb.addInstr(storeInstr);
                 }
             }
         }
 
     }
 
-    private ArrayList<Value> visitInitVal(InitVal initVal, BasicBlock bb) {
-        return visitInitVal(initVal, bb, IntType.I32);
+    private ArrayList<Value> visitInitVal(InitVal initVal) {
+        return visitInitVal(initVal, IntType.I32);
     }
 
-    private ArrayList<Value> visitInitVal(InitVal initVal, BasicBlock bb, IRType needType) {
+    private ArrayList<Value> visitInitVal(InitVal initVal,  IRType needType) {
         // InitVal → Exp | '{' [ Exp { ',' Exp } ] '}' | StringConst
         // 返回值为最终计算好初值的%i 的list，如果是单个变量，则取0号位
         ArrayList<Value> initVals = new ArrayList<>();
-        boolean isConst = bb == null;
+        boolean isConst = curbb == null;
 
         if (initVal.getExp() != null) {
             // single variable
-            initVals.add(visitExp(initVal.getExp(), isConst, bb, needType));
+            initVals.add(visitExp(initVal.getExp(), isConst, needType));
         } else if (initVal.getStringConst() != null) {
             String string = initVal.getStringConst().getContent();
             string = string.substring(1, string.length() - 1);
@@ -273,23 +276,23 @@ public class IRgenerator {
         } else {
             // exps for array
             for (Exp exp : initVal.getExpList()) {
-                initVals.add(visitExp(exp, isConst, bb, needType));
+                initVals.add(visitExp(exp, isConst, needType));
             }
         }
         return initVals;
     }
 
-    private void visitConstDecl(ConstDecl constDecl, BasicBlock bb) {
+    private void visitConstDecl(ConstDecl constDecl) {
         // 'const' BType ConstDef { ',' ConstDef } ';'
         BType type = constDecl.getBType();
         for (ConstDef constDef : constDecl.getConstDefs()) {
-            visitConstDef(constDef, type, bb);
+            visitConstDef(constDef, type);
         }
     }
 
-    private void visitConstDef(ConstDef constDef, BType type, BasicBlock bb) {
+    private void visitConstDef(ConstDef constDef, BType type) {
         //  ConstDef → Ident [ '[' ConstExp ']' ] '=' ConstInitVal, 变量 or 数组
-        boolean isGlobal = bb == null;
+        boolean isGlobal = curbb == null;
         String name = constDef.getIdent().getContent();
         if (constDef.getConstExp() != null) {
             // array
@@ -305,17 +308,17 @@ public class IRgenerator {
                 constSymTable.insert(name, globalVar.getInitValue());
             } else {
                 // 局部常数组，局部变量在basicBlock中分配，直接给增加语句即可
-                AllocaInstr allocaInst = new AllocaInstr("%" + (++reg_num), arrayType, bb);
+                AllocaInstr allocaInst = new AllocaInstr("%" + (++reg_num), arrayType, curbb);
                 // curSymTable.insert(allocaInst.getName(), allocaInst);
-                bb.addInstr(allocaInst);
+                curbb.addInstr(allocaInst);
                 ArrayList<ConstValue> initVals = ((ConstArray) initVal).getElements();
                 assert elementType.equals(initVals.get(0).getType());
                 //TODO: C&D
                 for (int i = 0; i < initVals.size(); i++) {
-                    GetelementptrInstr ptr = new GetelementptrInstr("%" + (++reg_num), allocaInst, new ConstInt(i, elementType), bb);
-                    StoreInstr storeInstr = new StoreInstr(initVals.get(i), ptr, bb);
-                    bb.addInstr(ptr);
-                    bb.addInstr(storeInstr);
+                    GetelementptrInstr ptr = new GetelementptrInstr("%" + (++reg_num), allocaInst, new ConstInt(i, elementType), curbb);
+                    StoreInstr storeInstr = new StoreInstr(initVals.get(i), ptr, curbb);
+                    curbb.addInstr(ptr);
+                    curbb.addInstr(storeInstr);
                 }
                 curSymTable.insert(name, allocaInst);//局部变量放一个alloc语句，用来找是哪个name。
                 constSymTable.insert(name, initVal);
@@ -332,10 +335,10 @@ public class IRgenerator {
                 constSymTable.insert(name, globalVar.getInitValue());
             } else {
                 // 局部常变量
-                AllocaInstr allocaInst = new AllocaInstr("%" + (++reg_num), BType2IRType(type), bb);
-                StoreInstr storeInst = new StoreInstr(initVal, allocaInst, bb);
-                bb.addInstr(allocaInst);
-                bb.addInstr(storeInst);
+                AllocaInstr allocaInst = new AllocaInstr("%" + (++reg_num), BType2IRType(type), curbb);
+                StoreInstr storeInst = new StoreInstr(initVal, allocaInst, curbb);
+                curbb.addInstr(allocaInst);
+                curbb.addInstr(storeInst);
                 curSymTable.insert(name, allocaInst);//局部变量放一个alloc语句，用来找是哪个name。
                 constSymTable.insert(name, initVal);
             }
@@ -383,10 +386,10 @@ public class IRgenerator {
 
     private int visitConstExp(ConstExp constExp, IRType needType) {
         //  ConstExp → AddExp, no need to generate, BB = null
-        return ((ConstInt) visitAddExp(constExp.getAddExp(), true, null, needType)).getValue();
+        return ((ConstInt) visitAddExp(constExp.getAddExp(), true, needType)).getValue();
     }
 
-    private Value visitAddExp(AddExp addExp, boolean isConst, BasicBlock bb, IRType needType) {
+    private Value visitAddExp(AddExp addExp, boolean isConst, IRType needType) {
         // 如果是const，返回ConstInt代表数值，否则返回value, TODO check
         // AddExp → MulExp | AddExp ('+' | '−') MulExp
         if (isConst) {
@@ -395,33 +398,33 @@ public class IRgenerator {
             ArrayList<Token> ops = addExp.getAddOps();
             for (int i = 0; i < mulExps.size(); i++) {
                 if (i == 0) {
-                    res = ((ConstInt) visitMulExp(mulExps.get(i), true, bb)).getValue();
+                    res = ((ConstInt) visitMulExp(mulExps.get(i), true)).getValue();
                 } else {
-                    res = calc(ops.get(i - 1), res, ((ConstInt) visitMulExp(mulExps.get(i), true, bb)).getValue());
+                    res = calc(ops.get(i - 1), res, ((ConstInt) visitMulExp(mulExps.get(i), true)).getValue());
                 }
             }
             return new ConstInt(res, needType);
         } else {
-            Value res = visitMulExp(addExp.getMulExps().get(0), false, bb, needType);
+            Value res = visitMulExp(addExp.getMulExps().get(0), false, needType);
             for (int i = 1; i < addExp.getMulExps().size(); i++) {
-                Value mulExpVal = visitMulExp(addExp.getMulExps().get(i), false, bb, needType);
+                Value mulExpVal = visitMulExp(addExp.getMulExps().get(i), false, needType);
                 if (needType != IntType.I32) {
-                    res = Convert(res, IntType.I32, bb);
-                    mulExpVal = Convert(mulExpVal, IntType.I32, bb);
+                    res = Convert(res, IntType.I32);
+                    mulExpVal = Convert(mulExpVal, IntType.I32);
                 }
-                CalcInstr calcInstr = new CalcInstr(Op2Op(addExp.getAddOps().get(i - 1).getContent()), "%" + (++reg_num), res, mulExpVal, bb);
-                bb.addInstr(calcInstr);
+                CalcInstr calcInstr = new CalcInstr(Op2Op(addExp.getAddOps().get(i - 1).getContent()), "%" + (++reg_num), res, mulExpVal, curbb);
+                curbb.addInstr(calcInstr);
                 res = calcInstr;
             }
-            return Convert(res, needType, bb);
+            return Convert(res, needType);
         }
     }
 
-    private Value visitMulExp(MulExp mulExp, boolean isConst, BasicBlock bb) {
-        return visitMulExp(mulExp, isConst, bb, IntType.I32);
+    private Value visitMulExp(MulExp mulExp, boolean isConst) {
+        return visitMulExp(mulExp, isConst, IntType.I32);
     }
 
-    private Value visitMulExp(MulExp mulExp, boolean isConst, BasicBlock bb, IRType needType) {
+    private Value visitMulExp(MulExp mulExp, boolean isConst, IRType needType) {
         // MulExp → UnaryExp | MulExp ('*' | '/' | '%') UnaryExp
         ArrayList<UnaryExp> unaryExps = mulExp.getUnaryExps();
         ArrayList<Token> ops = mulExp.getOperators();
@@ -430,33 +433,33 @@ public class IRgenerator {
 
             for (int i = 0; i < unaryExps.size(); i++) {
                 if (i == 0) {
-                    res = ((ConstInt) visitUnaryExp(unaryExps.get(i), true, bb)).getValue();
+                    res = ((ConstInt) visitUnaryExp(unaryExps.get(i), true)).getValue();
                 } else {
-                    res = calc(ops.get(i - 1), res, ((ConstInt) visitUnaryExp(unaryExps.get(i), true, bb)).getValue());
+                    res = calc(ops.get(i - 1), res, ((ConstInt) visitUnaryExp(unaryExps.get(i), true)).getValue());
                 }
             }
             return new ConstInt(res, needType);
         } else {
-            Value res = visitUnaryExp(unaryExps.get(0), false, bb, needType);
+            Value res = visitUnaryExp(unaryExps.get(0), false, needType);
             for (int i = 1; i < unaryExps.size(); i++) {
-                Value unaryExpVal = visitUnaryExp(unaryExps.get(i), false, bb, needType);
+                Value unaryExpVal = visitUnaryExp(unaryExps.get(i), false, needType);
                 if (needType != IntType.I32) {
-                    res = Convert(res, IntType.I32, bb);
-                    unaryExpVal = Convert(unaryExpVal, IntType.I32, bb);
+                    res = Convert(res, IntType.I32);
+                    unaryExpVal = Convert(unaryExpVal, IntType.I32);
                 }
-                CalcInstr calcInstr = new CalcInstr(Op2Op(ops.get(i - 1).getContent()), "%" + (++reg_num), res, unaryExpVal, bb);
-                bb.addInstr(calcInstr);
+                CalcInstr calcInstr = new CalcInstr(Op2Op(ops.get(i - 1).getContent()), "%" + (++reg_num), res, unaryExpVal, curbb);
+                curbb.addInstr(calcInstr);
                 res = calcInstr;
             }
-            return Convert(res, needType, bb);
+            return Convert(res, needType);
         }
     }
 
-    private Value visitUnaryExp(UnaryExp unaryExp, boolean isConst, BasicBlock bb) {
-        return visitUnaryExp(unaryExp, isConst, bb, IntType.I32);
+    private Value visitUnaryExp(UnaryExp unaryExp, boolean isConst) {
+        return visitUnaryExp(unaryExp, isConst, IntType.I32);
     }
 
-    private Value visitUnaryExp(UnaryExp unaryExp, boolean isConst, BasicBlock bb, IRType needType) {
+    private Value visitUnaryExp(UnaryExp unaryExp, boolean isConst, IRType needType) {
         //  UnaryExp → PrimaryExp | Ident '(' [FuncRParams] ')' | UnaryOp UnaryExp
         // {UnaryOp} (PrimaryExp | Ident ([FuncRParams]))
         boolean isCond = false;
@@ -481,7 +484,7 @@ public class IRgenerator {
             int res = 0;
             if (unaryExp.getPrimaryExp() != null) {
                 // PrimaryExp
-                res = ((ConstInt) visitPrimaryExp(unaryExp.getPrimaryExp(), true, bb)).getValue();
+                res = ((ConstInt) visitPrimaryExp(unaryExp.getPrimaryExp(), true)).getValue();
             } else {
                 System.err.println("Error: func call in const mode");
                 // 函数调用
@@ -503,10 +506,10 @@ public class IRgenerator {
         } else {
             Value res;
             if (unaryExp.getPrimaryExp() != null) {
-                res = visitPrimaryExp(unaryExp.getPrimaryExp(), false, bb, needType);
+                res = visitPrimaryExp(unaryExp.getPrimaryExp(), false, needType);
 //                if (res.getType() == IntType.I8) {
 //                    res = new ZextInstr("%" + (++reg_num), res, new Value("",IntType.I32), bb);
-//                    bb.addInstr((ZextInstr) res);
+//                    curbb.addInstr((ZextInstr) res);
 //                }
             } else if (unaryExp.getIdent() != null) {
                 // function call; func call
@@ -516,25 +519,25 @@ public class IRgenerator {
                     ArrayList<Value> params = new ArrayList<>();
                     for (int i = 0; i < unaryExp.getFuncRParams().getExps().size(); i++) {
                         Exp funcRParam = unaryExp.getFuncRParams().getExps().get(i);
-                        params.add(visitExp(funcRParam, false, bb, func.getParaList().get(i)));
+                        params.add(visitExp(funcRParam, false, func.getParaList().get(i)));
                     }
                     if (retType == IntType.VOID) {
-                        CallInstr callInstr = new CallInstr(func, bb, params); // Void没返回值，直接return
-                        bb.addInstr(callInstr);
+                        CallInstr callInstr = new CallInstr(func, curbb, params); // Void没返回值，直接return
+                        curbb.addInstr(callInstr);
                         return null;
                     } else {
-                        CallInstr callInstr = new CallInstr("%" + (++reg_num), func, bb, params);
-                        bb.addInstr(callInstr);
+                        CallInstr callInstr = new CallInstr("%" + (++reg_num), func, curbb, params);
+                        curbb.addInstr(callInstr);
                         res = callInstr;
                     }
                 } else {
                     if (retType == IntType.VOID) {
-                        CallInstr callInstr = new CallInstr(func, bb, null); // Void没返回值，直接return
-                        bb.addInstr(callInstr);
+                        CallInstr callInstr = new CallInstr(func, curbb, null); // Void没返回值，直接return
+                        curbb.addInstr(callInstr);
                         return null;
                     } else {
-                        res = new CallInstr("%" + (++reg_num), func, bb, null);
-                        bb.addInstr((CallInstr) res);
+                        res = new CallInstr("%" + (++reg_num), func, curbb, null);
+                        curbb.addInstr((CallInstr) res);
                     }
                 }
             } else {
@@ -545,42 +548,42 @@ public class IRgenerator {
                 assert (needType == IntType.I1);
                 System.out.println("Check needType for cond");
                 if (reverseFlag) {
-                    IcmpInstr icmpInstr = new IcmpInstr(Operator.ne, "%" + (++reg_num), res, new ConstInt(1, IntType.I1), bb);
-                    bb.addInstr(icmpInstr);
+                    IcmpInstr icmpInstr = new IcmpInstr(Operator.ne, "%" + (++reg_num), res, new ConstInt(1, IntType.I1), curbb);
+                    curbb.addInstr(icmpInstr);
                     return icmpInstr;
                 } else {
-                    IcmpInstr icmpInstr = new IcmpInstr(Operator.ne, "%" + (++reg_num), res, new ConstInt(0, IntType.I1), bb);
-                    bb.addInstr(icmpInstr);
+                    IcmpInstr icmpInstr = new IcmpInstr(Operator.ne, "%" + (++reg_num), res, new ConstInt(0, IntType.I1), curbb);
+                    curbb.addInstr(icmpInstr);
                     return icmpInstr;
                 }
             } else {
                 if (minus == 1) {
-                    return Convert(res, needType, bb);
+                    return Convert(res, needType);
                 }
                 if (needType != IntType.I32) {
-                    res = Convert(res, IntType.I32, bb);
+                    res = Convert(res, IntType.I32);
                 }
-                CalcInstr calcInstr = new CalcInstr(Operator.sub, "%" + (++reg_num), new ConstInt(0, IntType.I32), res, bb);
-                bb.addInstr(calcInstr);
-                return Convert(calcInstr, needType, bb);
+                CalcInstr calcInstr = new CalcInstr(Operator.sub, "%" + (++reg_num), new ConstInt(0, IntType.I32), res, curbb);
+                curbb.addInstr(calcInstr);
+                return Convert(calcInstr, needType);
             }
         }
     }
 
-    private Value visitPrimaryExp(PrimaryExp primaryExp, boolean isConst, BasicBlock bb) {
-        return visitPrimaryExp(primaryExp, isConst, bb, IntType.I32);
+    private Value visitPrimaryExp(PrimaryExp primaryExp, boolean isConst) {
+        return visitPrimaryExp(primaryExp, isConst, IntType.I32);
         //停在这里，因为char函数会返回i8，没必要转到32再转回来，因此设置needType，遇到i32计算再放大。
     }
 
-    private Value visitPrimaryExp(PrimaryExp primaryExp, boolean isConst, BasicBlock bb, IRType needType) {
+    private Value visitPrimaryExp(PrimaryExp primaryExp, boolean isConst, IRType needType) {
         // PrimaryExp → '(' Exp ')' | LVal | Number | Character
         if (isConst) {
             int res = 0;
             if (primaryExp.getExp() != null) {
-                res = ((ConstInt) visitExp(primaryExp.getExp(), true, bb)).getValue();
+                res = ((ConstInt) visitExp(primaryExp.getExp(), true)).getValue();
             } else if (primaryExp.getLVal() != null) {
                 //理论上不包括数组元素
-                res = ((ConstInt) visitLVal(primaryExp.getLVal(), true, bb)).getValue();
+                res = ((ConstInt) visitLVal(primaryExp.getLVal(), true)).getValue();
             } else if (primaryExp.getNumber() != null) {
                 res = primaryExp.getNumber().getNum();
             } else if (primaryExp.getCharacter() != null) {
@@ -591,9 +594,9 @@ public class IRgenerator {
             return new ConstInt(res, needType);
         } else {
             if (primaryExp.getLVal() != null) {
-                return visitLVal(primaryExp.getLVal(), false, bb, needType);
+                return visitLVal(primaryExp.getLVal(), false, needType);
             } else if (primaryExp.getExp() != null) {
-                return visitExp(primaryExp.getExp(), false, bb, needType);
+                return visitExp(primaryExp.getExp(), false, needType);
             } else if (primaryExp.getNumber() != null) {
                 return new ConstInt(primaryExp.getNumber().getNum(), needType);
             } else if (primaryExp.getCharacter() != null) {
@@ -605,19 +608,19 @@ public class IRgenerator {
         }
     }
 
-    private Value visitExp(Exp exp, boolean isConst, BasicBlock bb) {
-        return visitExp(exp, isConst, bb, IntType.I32);
+    private Value visitExp(Exp exp, boolean isConst) {
+        return visitExp(exp, isConst, IntType.I32);
     }
 
-    private Value visitExp(Exp exp, boolean isConst, BasicBlock bb, IRType needType) {
-        return visitAddExp(exp.getAddExp(), isConst, bb, needType);
+    private Value visitExp(Exp exp, boolean isConst, IRType needType) {
+        return visitAddExp(exp.getAddExp(), isConst, needType);
     }
 
-    private Value visitLVal(LVal lVal, boolean isConst, BasicBlock bb) {
-        return visitLVal(lVal, isConst, bb, IntType.I32);
+    private Value visitLVal(LVal lVal, boolean isConst) {
+        return visitLVal(lVal, isConst, IntType.I32);
     }
 
-    private Value visitLVal(LVal lVal, boolean isConst, BasicBlock bb, IRType needType) {
+    private Value visitLVal(LVal lVal, boolean isConst, IRType needType) {
         // 这里返回的是读出来的值。
         //  LVal → Ident ['[' Exp ']']
         if (isConst) {
@@ -638,29 +641,29 @@ public class IRgenerator {
                 // TODO: load !
                 GetelementptrInstr ptrInstr;
                 if (((PointerType) res.getType()).getPointeeType() instanceof ArrayType) {
-                    Value expval = visitExp(lVal.getExp(), false, bb);
-                    ptrInstr = new GetelementptrInstr("%" + (++reg_num), res, expval, bb);
-                    bb.addInstr(ptrInstr);
+                    Value expval = visitExp(lVal.getExp(), false);
+                    ptrInstr = new GetelementptrInstr("%" + (++reg_num), res, expval, curbb);
+                    curbb.addInstr(ptrInstr);
                 } else if (((PointerType) res.getType()).getPointeeType() instanceof PointerType) {
                     // i32**;
-                    LoadInstr loadInstr1 = new LoadInstr("%" + (++reg_num), res, bb);
-                    bb.addInstr(loadInstr1);
-                    Value expval = visitExp(lVal.getExp(), false, bb);
-                    ptrInstr = new GetelementptrInstr("%" + (++reg_num), loadInstr1, expval, bb, true);
-                    bb.addInstr(ptrInstr);
+                    LoadInstr loadInstr1 = new LoadInstr("%" + (++reg_num), res, curbb);
+                    curbb.addInstr(loadInstr1);
+                    Value expval = visitExp(lVal.getExp(), false);
+                    ptrInstr = new GetelementptrInstr("%" + (++reg_num), loadInstr1, expval, curbb, true);
+                    curbb.addInstr(ptrInstr);
                 } else {
                     System.err.println("error in visitLVal !");
                     ptrInstr = null;
                 }
 //                LoadInstr loadInstr1 = new LoadInstr("%" + (++reg_num), res, bb);
-//                bb.addInstr(loadInstr1);
+//                curbb.addInstr(loadInstr1);
 //                Value expval = visitExp(lVal.getExp(), false, bb);
 //                GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), loadInstr1, expval, bb);
-//                bb.addInstr(ptrInstr);
+//                curbb.addInstr(ptrInstr);
                 // TODO check
-                LoadInstr loadInstr = new LoadInstr("%" + (++reg_num), ptrInstr, bb);
-                bb.addInstr(loadInstr);
-                return Convert(loadInstr, needType, bb);
+                LoadInstr loadInstr = new LoadInstr("%" + (++reg_num), ptrInstr, curbb);
+                curbb.addInstr(loadInstr);
+                return Convert(loadInstr, needType);
             } else {
                 // global variable or local variable
                 // array without index
@@ -671,13 +674,13 @@ public class IRgenerator {
                         IRType basicType = ((ArrayType) ((PointerType) res.getType()).getPointeeType()).getElementType();
                         assert (Objects.equals(needType, new PointerType(basicType)));
                     }
-                    GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), res, new ConstInt(0), bb);
-                    bb.addInstr(ptrInstr);
-                    return Convert(ptrInstr, needType, bb);
+                    GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), res, new ConstInt(0), curbb);
+                    curbb.addInstr(ptrInstr);
+                    return Convert(ptrInstr, needType);
                 } else {
-                    LoadInstr loadInstr = new LoadInstr("%" + (++reg_num), res, bb);
-                    bb.addInstr(loadInstr);
-                    return Convert(loadInstr, needType, bb);
+                    LoadInstr loadInstr = new LoadInstr("%" + (++reg_num), res, curbb);
+                    curbb.addInstr(loadInstr);
+                    return Convert(loadInstr, needType);
                 }
 
             }
@@ -695,8 +698,8 @@ public class IRgenerator {
 
 
         createSonTable();
-        BasicBlock bb = func.getFirstBlock();
-        visitBlock(mainFuncDef.getBlock(), func, bb, false);
+        curbb = func.getFirstBlock();
+        visitBlock(mainFuncDef.getBlock(), func, false);
         module.addFunction(func);
         exitSonTable();
     }
@@ -713,10 +716,7 @@ public class IRgenerator {
                     // array
                     tmpType = new PointerType(tmpType);
                     // 指向数组的指针？
-                } /*else {
-                    // var
-                    AllocaInstr para = new AllocaInstr("%"+reg_num, tmpType, bb);
-                }*/
+                }
                 paramTypes.add(tmpType);
             }
             reg_num = paramTypes.size();
@@ -741,6 +741,7 @@ public class IRgenerator {
         createSonTable();
         // alloca & store ; 符号表！
         BasicBlock bb = func.getFirstBlock();
+        curbb = bb;
         curSymTable.insert(funcName, func);
         if (!paramTypes.isEmpty()) {
             for (int i = 0; i < paramTypes.size(); i++) {
@@ -748,32 +749,32 @@ public class IRgenerator {
                 String paraName = "%" + i;
                 Argument paraArgument = new Argument(paraName, paramType);
 
-                AllocaInstr para = new AllocaInstr("%" + (++reg_num), paramType, bb);
+                AllocaInstr para = new AllocaInstr("%" + (++reg_num), paramType, curbb);
                 curSymTable.insert(funcDef.getFuncFParams().getFuncFParams().get(i).getIdent().getContent(), para);
-                bb.addInstr(para);
-                StoreInstr store = new StoreInstr(paraArgument, para, bb);
-                bb.addInstr(store);
+                curbb.addInstr(para);
+                StoreInstr store = new StoreInstr(paraArgument, para, curbb);
+                curbb.addInstr(store);
             }
         }
 
-        visitBlock(funcDef.getBlock(), func, bb, false);
+        visitBlock(funcDef.getBlock(), func, false);
         if (bb.getTerminator() == null) {
-            ReturnInstr retInstr = new ReturnInstr(bb);
-            bb.addInstr(retInstr);
+            ReturnInstr retInstr = new ReturnInstr(curbb);
+            curbb.addInstr(retInstr);
         }
         module.addFunction(func);
         exitSonTable();
     }
 
-    private void visitBlock(Block block, Function func, BasicBlock bb, boolean needCreate) {
+    private void visitBlock(Block block, Function func, boolean needCreate) {
         if (needCreate) {
             createSonTable();
         }
         for (BlockItem blockItem : block.getBlockItems()) {
             if (blockItem.getDecl() != null) {
-                visitDecl(blockItem.getDecl(), bb);
+                visitDecl(blockItem.getDecl());
             } else {
-                visitStmt(blockItem.getStmt(), func, bb);
+                visitStmt(blockItem.getStmt(), func);
             }
         }
         if (needCreate) {
@@ -781,39 +782,39 @@ public class IRgenerator {
         }
     }
 
-    private Value getLeftLval(LVal lVal, BasicBlock bb) {
+    private Value getLeftLval(LVal lVal) {
         if (lVal.getExp() == null) {
             return curSymTable.find(lVal.getIdent().getContent());
         } else {
-            Value index = visitExp(lVal.getExp(), false, bb);
+            Value index = visitExp(lVal.getExp(), false);
             Value res = curSymTable.find(lVal.getIdent().getContent());
             if (((PointerType) res.getType()).getPointeeType() instanceof PointerType) {
                 // i32**; means para[] in func
-                LoadInstr loadInstr1 = new LoadInstr("%" + (++reg_num), res, bb);
-                bb.addInstr(loadInstr1);
+                LoadInstr loadInstr1 = new LoadInstr("%" + (++reg_num), res, curbb);
+                curbb.addInstr(loadInstr1);
                 res = loadInstr1;
-                GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), res, index, bb, true);
-                bb.addInstr(ptrInstr);
+                GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), res, index, curbb, true);
+                curbb.addInstr(ptrInstr);
                 return ptrInstr;
             }
-            GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), res, index, bb);
-            bb.addInstr(ptrInstr);
+            GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), res, index, curbb);
+            curbb.addInstr(ptrInstr);
             return ptrInstr;
         }
     }
 
-    private void visitStmt(Stmt stmt, Function func, BasicBlock bb) {
+    private void visitStmt(Stmt stmt, Function func) {
         if (stmt.getAssignStmt() != null) {
-            Value left = getLeftLval(stmt.getAssignStmt().getlVal(), bb);
+            Value left = getLeftLval(stmt.getAssignStmt().getlVal());
             PointerType leftType = (PointerType) left.getType();
             IRType needType = leftType.getPointeeType();
-            Value exp = visitExp(stmt.getAssignStmt().getExp(), false, bb, needType);
-            StoreInstr storeInstr = new StoreInstr(exp, left, bb);
-            bb.addInstr(storeInstr);
+            Value exp = visitExp(stmt.getAssignStmt().getExp(), false, needType);
+            StoreInstr storeInstr = new StoreInstr(exp, left, curbb);
+            curbb.addInstr(storeInstr);
         } else if (stmt.getBlock() != null) {
-            visitBlock(stmt.getBlock(), func, bb, true);
+            visitBlock(stmt.getBlock(), func, true);
         } else if (stmt.getIfStmt() != null) {
-
+            visitIfStmt(stmt.getIfStmt(), func);
         } else if (stmt.getForStmts() != null) {
 
         } else if (stmt.getBreak() != null) {
@@ -823,40 +824,35 @@ public class IRgenerator {
         } else if (stmt.getReturn() != null) {
             if (stmt.getReturn().getExp() != null) {
                 // return [exp];
-                Value ret = visitExp(stmt.getReturn().getExp(), false, bb, ((FunctionType) func.getType()).getRetType()); // i32
-                /*if (ret.getType() != ((FunctionType)func.getType()).getRetType()) {
-                    TruncInstr truncInstr = new TruncInstr("%" + (++reg_num), ret, new Value("",IntType.I8), bb);
-                    bb.addInstr(truncInstr);
-                    ret = truncInstr;
-                }*/
-                ReturnInstr retInstr = new ReturnInstr(ret, bb);
-                bb.addInstr(retInstr);
-                bb.setTerminator(retInstr);
+                Value ret = visitExp(stmt.getReturn().getExp(), false, ((FunctionType) func.getType()).getRetType()); // i32
+                ReturnInstr retInstr = new ReturnInstr(ret, curbb);
+                curbb.addInstr(retInstr);
+                curbb.setTerminator(retInstr);
             } else {
-                ReturnInstr retInstr = new ReturnInstr(bb);
-                bb.addInstr(retInstr);
-                bb.setTerminator(retInstr);
+                ReturnInstr retInstr = new ReturnInstr(curbb);
+                curbb.addInstr(retInstr);
+                curbb.setTerminator(retInstr);
 
                 // return;
             }
         } else if (stmt.getInputChar() != null) {
-            CallInstr callInstr = new CallInstr("%" + (++reg_num), (Function) curSymTable.find("getchar"), bb, null);
-            bb.addInstr(callInstr);
-            TruncInstr truncInstr = new TruncInstr("%" + (++reg_num), callInstr, new Value("", IntType.I8), bb);
-            bb.addInstr(truncInstr);
-            Value lval = getLeftLval(stmt.getInputChar().getLVal(), bb);
-            StoreInstr storeInstr = new StoreInstr(truncInstr, lval, bb);
-            bb.addInstr(storeInstr);
+            CallInstr callInstr = new CallInstr("%" + (++reg_num), (Function) curSymTable.find("getchar"), curbb, null);
+            curbb.addInstr(callInstr);
+            TruncInstr truncInstr = new TruncInstr("%" + (++reg_num), callInstr, new Value("", IntType.I8), curbb);
+            curbb.addInstr(truncInstr);
+            Value lval = getLeftLval(stmt.getInputChar().getLVal());
+            StoreInstr storeInstr = new StoreInstr(truncInstr, lval, curbb);
+            curbb.addInstr(storeInstr);
         } else if (stmt.getInputInt() != null) {
-            CallInstr callInstr = new CallInstr("%" + (++reg_num), (Function) curSymTable.find("getint"), bb, null);
-            bb.addInstr(callInstr);
-            Value lval = getLeftLval(stmt.getInputInt().getLVal(), bb);
-            StoreInstr storeInstr = new StoreInstr(callInstr, lval, bb);
-            bb.addInstr(storeInstr);
+            CallInstr callInstr = new CallInstr("%" + (++reg_num), (Function) curSymTable.find("getint"), curbb, null);
+            curbb.addInstr(callInstr);
+            Value lval = getLeftLval(stmt.getInputInt().getLVal());
+            StoreInstr storeInstr = new StoreInstr(callInstr, lval, curbb);
+            curbb.addInstr(storeInstr);
         } else if (stmt.getPrintf() != null) {
-            visitPrintf(stmt.getPrintf(), bb);
+            visitPrintf(stmt.getPrintf());
         } else if (stmt.getExp() != null) {
-            visitExp(stmt.getExp(), false, bb);
+            visitExp(stmt.getExp(), false);
         } else if (stmt.getSemicn() != null) {
             // should be the else one
             ;
@@ -865,7 +861,26 @@ public class IRgenerator {
         }
     }
 
-    private void visitPrintf(Printf printf, BasicBlock bb) {
+    private void visitIfStmt(IfStmt ifStmt, Function func) {
+//        Value cond = visitCond(ifStmt.getCond(), false, IntType.I1);
+//
+//        BasicBlock trueBB = new BasicBlock((++reg_num) + "", func);
+//        BasicBlock nextBB = new BasicBlock((++reg_num) + "", func);
+//        if (ifStmt.getElseStmt() != null) {
+//            BasicBlock falseBB = new BasicBlock((++reg_num) + "", func);
+//            BrInstr brInstr = new BrInstr(curbb, cond, trueBB, falseBB);
+//            curbb.addInstr(brInstr);
+//            visitStmt(ifStmt.getStmt(), func);
+//            trueBB.addInstr(new BrInstr(trueBB, nextBB));
+//            visitStmt(ifStmt.getElseStmt(), func);
+//            falseBB.addInstr(new BrInstr(falseBB, nextBB));
+//        } else {
+//            BrInstr brInstr = new BrInstr(curbb, cond, trueBB, nextBB);
+//            curbb.addInstr(brInstr);
+//        }
+    }
+
+    private void visitPrintf(Printf printf) {
         // printf("aldfk %d %c");
         String str = printf.getStringConst();
         str = str.substring(1, str.length() - 1);
@@ -878,22 +893,20 @@ public class IRgenerator {
                         String strLit = str.substring(begin, i);
                         StringLiteral stringLiteral = new StringLiteral(strLit);
                         module.addStringLiteral(stringLiteral);
-                        GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), stringLiteral, new ConstInt(0), bb);
-                        bb.addInstr(ptrInstr);
-                        CallInstr callInstr = new CallInstr((Function) curSymTable.find("putstr"), bb, new ArrayList<Value>(Collections.singletonList(ptrInstr)));
-                        bb.addInstr(callInstr);
+                        GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), stringLiteral, new ConstInt(0), curbb);
+                        curbb.addInstr(ptrInstr);
+                        CallInstr callInstr = new CallInstr((Function) curSymTable.find("putstr"), curbb, new ArrayList<Value>(Collections.singletonList(ptrInstr)));
+                        curbb.addInstr(callInstr);
                     }
                     begin = i + 2;
                     if (str.charAt(i + 1) == 'd') {
-                        Value expvalue = visitExp(printf.getExps().get(exp_cnt), false, bb);
-                        CallInstr callInstr = new CallInstr((Function) curSymTable.find("putint"), bb, new ArrayList<Value>(Collections.singletonList(expvalue)));
-                        bb.addInstr(callInstr);
+                        Value expvalue = visitExp(printf.getExps().get(exp_cnt), false);
+                        CallInstr callInstr = new CallInstr((Function) curSymTable.find("putint"), curbb, new ArrayList<Value>(Collections.singletonList(expvalue)));
+                        curbb.addInstr(callInstr);
                     } else {
-                        Value expvalue = visitExp(printf.getExps().get(exp_cnt), false, bb, IntType.I32);
-//                        ZextInstr zextInstr = new ZextInstr("%" + (++reg_num), expvalue, new Value("", IntType.I32), bb);
-//                        bb.addInstr(zextInstr);
-                        CallInstr callInstr = new CallInstr((Function) curSymTable.find("putch"), bb, new ArrayList<Value>(Collections.singletonList(expvalue)));
-                        bb.addInstr(callInstr);
+                        Value expvalue = visitExp(printf.getExps().get(exp_cnt), false, IntType.I32);
+                        CallInstr callInstr = new CallInstr((Function) curSymTable.find("putch"), curbb, new ArrayList<Value>(Collections.singletonList(expvalue)));
+                        curbb.addInstr(callInstr);
                     }
                     exp_cnt++;
                 }
@@ -903,10 +916,10 @@ public class IRgenerator {
             String strLit = str.substring(begin);
             StringLiteral stringLiteral = new StringLiteral(strLit);
             module.addStringLiteral(stringLiteral);
-            GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), stringLiteral, new ConstInt(0), bb);
-            bb.addInstr(ptrInstr);
-            CallInstr callInstr = new CallInstr((Function) curSymTable.find("putstr"), bb, new ArrayList<Value>(Collections.singletonList(ptrInstr)));
-            bb.addInstr(callInstr);
+            GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), stringLiteral, new ConstInt(0), curbb);
+            curbb.addInstr(ptrInstr);
+            CallInstr callInstr = new CallInstr((Function) curSymTable.find("putstr"), curbb, new ArrayList<Value>(Collections.singletonList(ptrInstr)));
+            curbb.addInstr(callInstr);
         }
 
     }
