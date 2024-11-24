@@ -19,10 +19,12 @@ public class BasicBlock extends Value{
         this.function = function;
     }
 
-    public void addInstr(Instruction instruction) {
+    public boolean addInstr(Instruction instruction) {
         if (terminator == null) {
             instructions.add(instruction);
+            return true;
         }
+        return false;
     }
 
     public ArrayList<Instruction> getInstructions() {

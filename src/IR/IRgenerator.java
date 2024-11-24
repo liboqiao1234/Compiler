@@ -27,10 +27,13 @@ import java.util.Objects;
 public class IRgenerator {
     private static IRgenerator instance = new IRgenerator();
     private int reg_num = -1;
-    private int bb_num = -1;
     private LLVMModule module = new LLVMModule();
     private SymbolTable<Value> curSymTable = new SymbolTable<Value>(null, 1);
     private SymbolTable<ConstValue> constSymTable = new SymbolTable<ConstValue>(null, 1);
+    private BasicBlock ForCheck = null;
+    private BasicBlock ForInside = null;
+    private BasicBlock ForAfter = null;
+    private BasicBlock afterForNext = null;
 
     public static IRgenerator getInstance() {
         return instance;
@@ -77,7 +80,7 @@ public class IRgenerator {
             return Arrays.asList(value1, value2);
         }
         assert type1 instanceof IntType && type2 instanceof IntType;
-        int maxbit = Math.max(((IntType)type1).getBits(), ((IntType) type2).getBits());
+        int maxbit = Math.max(((IntType) type1).getBits(), ((IntType) type2).getBits());
         IRType targetType = new IntType(maxbit);
         return Arrays.asList(Convert(value1, targetType), Convert(value2, targetType));
     }
@@ -95,6 +98,11 @@ public class IRgenerator {
             GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), value, new ConstInt(0), curbb);
             curbb.addInstr(ptrInstr);
             return ptrInstr;
+        }
+        if (type == IntType.I1) {
+            IcmpInstr icmpInstr = new IcmpInstr(Operator.ne,"%" + (++reg_num), value, new ConstInt(0), curbb);
+            curbb.addInstr(icmpInstr);
+            return icmpInstr;
         }
 
         if (value.getType() == IntType.I32) {
@@ -573,7 +581,7 @@ public class IRgenerator {
                 assert (needType == IntType.I1);
                 System.out.println("Check needType for cond");
                 if (reverseFlag) {
-                    IcmpInstr icmpInstr = new IcmpInstr(Operator.ne, "%" + (++reg_num), res, new ConstInt(1, IntType.I1), curbb);
+                    IcmpInstr icmpInstr = new IcmpInstr(Operator.eq, "%" + (++reg_num), res, new ConstInt(0, IntType.I1), curbb);
                     curbb.addInstr(icmpInstr);
                     return icmpInstr;
                 } else {
@@ -849,11 +857,29 @@ public class IRgenerator {
         } else if (stmt.getIfStmt() != null) {
             visitIfStmt(stmt.getIfStmt(), func);
         } else if (stmt.getForStmts() != null) {
-
+            visitForStmts(stmt.getForStmts(), func);
         } else if (stmt.getBreak() != null) {
-
+            assert afterForNext != null;
+            BrInstr brInstr = new BrInstr(curbb, afterForNext);
+            curbb.addInstr(brInstr);
+            curbb.setTerminator(brInstr);
+            func.addBlock(curbb);
+            BasicBlock nextBB = new BasicBlock("" + (++reg_num), func);
+            curbb = nextBB;
         } else if (stmt.getContinue() != null) {
-
+            BrInstr brInstr;
+            if (ForAfter != null) {
+                brInstr = new BrInstr(curbb, ForAfter);
+            } else if (ForCheck != null) {
+                brInstr = new BrInstr(curbb, ForCheck);
+            } else {
+                brInstr = new BrInstr(curbb, ForInside);
+            }
+            curbb.addInstr(brInstr);
+            curbb.setTerminator(brInstr);
+            func.addBlock(curbb);
+            BasicBlock nextBB = new BasicBlock("" + (++reg_num), func);
+            curbb = nextBB;
         } else if (stmt.getReturn() != null) {
             if (stmt.getReturn().getExp() != null) {
                 // return [exp];
@@ -894,6 +920,85 @@ public class IRgenerator {
         }
     }
 
+    private void visitForStmt(ForStmt forStmt) {
+        Value left = getLeftLval(forStmt.getlVal());
+        PointerType leftType = (PointerType) left.getType();
+        IRType needType = leftType.getPointeeType();
+        Value exp = visitExp(forStmt.getExp(), false, needType);
+        StoreInstr storeInstr = new StoreInstr(exp, left, curbb);
+        curbb.addInstr(storeInstr);
+    }
+
+    private void visitForStmts(ForStmts forStmts, Function func) {
+        if (forStmts.getForStmt1() != null) {
+            visitForStmt(forStmts.getForStmt1());
+        }
+        // 先判断，然后循环体，然后 forStmt2
+        BasicBlock inside = new BasicBlock("", func);
+        BasicBlock nextBB = new BasicBlock("", func);
+        BasicBlock checkFor = new BasicBlock("", func);
+        if (forStmts.getCond() != null) { // 有checkfor
+            checkFor.setName("" + (++reg_num));
+            BrInstr brInstr = new BrInstr(curbb, checkFor);
+            curbb.addInstr(brInstr);
+            curbb.setTerminator(brInstr);
+            func.addBlock(curbb);
+            curbb = checkFor;
+            ForCheck = checkFor;
+            visitCond(forStmts.getCond(), inside, nextBB);
+        } else { // 没有checkfor，直接回到循环体
+            ForCheck = null;
+            BrInstr brInstr = new BrInstr(curbb, inside);
+            curbb.addInstr(brInstr);
+            curbb.setTerminator(brInstr);
+        }
+        func.addBlock(curbb);
+        BasicBlock after = null;
+        if (forStmts.getForStmt2() != null) {
+            after = new BasicBlock("", func);
+            ForAfter = after;
+        } else {
+            ForAfter = null;
+        }
+        curbb = inside;
+        inside.setName("" + (++reg_num));
+        ForInside = inside;
+        afterForNext = nextBB;
+        visitStmt(forStmts.getStmt(), func);
+        if (forStmts.getForStmt2() != null) { // 有after
+            after.setName("" + (++reg_num));
+
+            BrInstr brInstr = new BrInstr(curbb, after);
+            curbb.addInstr(brInstr);
+            curbb.setTerminator(brInstr);
+            func.addBlock(curbb);
+            curbb = after;
+            visitForStmt(forStmts.getForStmt2());
+
+            BrInstr brInstr2;
+            if (forStmts.getCond() != null) {
+                brInstr2 = new BrInstr(curbb, checkFor);
+            } else {
+                brInstr2 = new BrInstr(curbb, inside);
+            }
+            curbb.addInstr(brInstr2);
+            curbb.setTerminator(brInstr2);
+        } else {
+            BrInstr brInstr2;
+            if (forStmts.getCond() != null) {
+                brInstr2 = new BrInstr(curbb, checkFor);
+            } else {
+                brInstr2 = new BrInstr(curbb, inside);
+            }
+            curbb.addInstr(brInstr2);
+            curbb.setTerminator(brInstr2);
+        }
+        func.addBlock(curbb);
+        curbb = nextBB;
+
+        nextBB.setName("" + (++reg_num));
+    }
+
     private Value visitRelExp(RelExp relExp) {
         ArrayList<AddExp> addExps = relExp.getAddExps();
         ArrayList<Token> ops = relExp.getRelOps();
@@ -905,18 +1010,19 @@ public class IRgenerator {
                 res = value;
             } else {
                 Token op = ops.get(i - 1);
-                List<Value> tmp = ConvertWhenIcmp(res,value);// TODO: check
+                List<Value> tmp = ConvertWhenIcmp(res, value);
                 res = tmp.get(0);
                 value = tmp.get(1);
                 IcmpInstr icmpInstr = new IcmpInstr(Op2Op(op.getContent()), "%" + (++reg_num), res, value, curbb);
                 curbb.addInstr(icmpInstr);
+                res = icmpInstr;
             }
         }
         return res;
 
     }
 
-    private Value visitEqExp(EqExp eqExp) {
+    private Value visitEqExp(EqExp eqExp) { // need to return I1
         ArrayList<RelExp> relExps = eqExp.getRelExps();
         ArrayList<Token> ops = eqExp.getEqOps();
         Value res = null;
@@ -927,7 +1033,7 @@ public class IRgenerator {
                 res = value;
             } else {
                 Token op = ops.get(i - 1);
-                List<Value> tmp = ConvertWhenIcmp(res,value);// TODO: check
+                List<Value> tmp = ConvertWhenIcmp(res, value);
                 res = tmp.get(0);
                 value = tmp.get(1);
                 IcmpInstr icmpInstr = new IcmpInstr(Op2Op(op.getContent()), "%" + (++reg_num), res, value, curbb);
