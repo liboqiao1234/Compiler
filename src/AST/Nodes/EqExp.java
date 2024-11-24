@@ -15,6 +15,10 @@ public class EqExp extends Node {
         this.relExps = relExps;
         this.eqOps = eqs;
     }
+
+    public ArrayList<Token> getEqOps() {
+        return eqOps;
+    }
     
     public ArrayList<RelExp> getRelExps() {
         return relExps;

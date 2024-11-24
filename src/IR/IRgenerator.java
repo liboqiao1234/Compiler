@@ -21,6 +21,7 @@ import Symbol.SymbolTable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 public class IRgenerator {
@@ -67,6 +68,18 @@ public class IRgenerator {
             default:
                 return 0;
         }
+    }
+
+    private List<Value> ConvertWhenIcmp(Value value1, Value value2) {
+        IRType type1 = value1.getType();
+        IRType type2 = value2.getType();
+        if (type1.equals(type2)) {
+            return Arrays.asList(value1, value2);
+        }
+        assert type1 instanceof IntType && type2 instanceof IntType;
+        int maxbit = Math.max(((IntType)type1).getBits(), ((IntType) type2).getBits());
+        IRType targetType = new IntType(maxbit);
+        return Arrays.asList(Convert(value1, targetType), Convert(value2, targetType));
     }
 
     private Value Convert(Value value, IRType type) {
@@ -117,6 +130,18 @@ public class IRgenerator {
                 return Operator.sdiv;
             case "%":
                 return Operator.srem;
+            case "==":
+                return Operator.eq;
+            case "!=":
+                return Operator.ne;
+            case ">":
+                return Operator.sgt;
+            case ">=":
+                return Operator.sge;
+            case "<":
+                return Operator.slt;
+            case "<=":
+                return Operator.sle;
             default:
                 return null;
         }
@@ -762,9 +787,10 @@ public class IRgenerator {
         }
 
         visitBlock(funcDef.getBlock(), func, false);
-        if (bb.getTerminator() == null) {
+        if (curbb.getTerminator() == null) {
             ReturnInstr retInstr = new ReturnInstr(curbb);
             curbb.addInstr(retInstr);
+            curbb.setTerminator(retInstr);
         }
         if (curbb != bb) {
             func.addBlock(curbb);
@@ -868,8 +894,48 @@ public class IRgenerator {
         }
     }
 
+    private Value visitRelExp(RelExp relExp) {
+        ArrayList<AddExp> addExps = relExp.getAddExps();
+        ArrayList<Token> ops = relExp.getRelOps();
+        Value res = null;
+        for (int i = 0; i < addExps.size(); i++) {
+            AddExp addExp = addExps.get(i);
+            Value value = visitAddExp(addExp, false, IntType.I32);// TODO: I32? null??
+            if (i == 0) {
+                res = value;
+            } else {
+                Token op = ops.get(i - 1);
+                List<Value> tmp = ConvertWhenIcmp(res,value);// TODO: check
+                res = tmp.get(0);
+                value = tmp.get(1);
+                IcmpInstr icmpInstr = new IcmpInstr(Op2Op(op.getContent()), "%" + (++reg_num), res, value, curbb);
+                curbb.addInstr(icmpInstr);
+            }
+        }
+        return res;
+
+    }
+
     private Value visitEqExp(EqExp eqExp) {
-        return testValueNeedToBeDeleted;
+        ArrayList<RelExp> relExps = eqExp.getRelExps();
+        ArrayList<Token> ops = eqExp.getEqOps();
+        Value res = null;
+        for (int i = 0; i < relExps.size(); i++) {
+            RelExp relExp = relExps.get(i);
+            Value value = visitRelExp(relExp);
+            if (i == 0) {
+                res = value;
+            } else {
+                Token op = ops.get(i - 1);
+                List<Value> tmp = ConvertWhenIcmp(res,value);// TODO: check
+                res = tmp.get(0);
+                value = tmp.get(1);
+                IcmpInstr icmpInstr = new IcmpInstr(Op2Op(op.getContent()), "%" + (++reg_num), res, value, curbb);
+                curbb.addInstr(icmpInstr);
+                res = icmpInstr;
+            }
+        }
+        return Convert(res, IntType.I1);
     }
 
     private void visitLAndExp(LAndExp lAndExp, BasicBlock trueBB, BasicBlock falseBB) {
@@ -906,7 +972,7 @@ public class IRgenerator {
             // 传参时应该注意： 前面几次and：成功true，失败next，最后一次and：成功true，失败false
             if (i != lorExp.getLAndExps().size() - 1) {
                 visitLAndExp(lAndExp, trueBB, nextBB);
-                nextBB.setName((++reg_num) +"");
+                nextBB.setName((++reg_num) + "");
                 //BrInstr brInstr = new BrInstr(curbb, value, trueBB, nextBB); 这个相当于在最后一个and结束时候加了
                 //curbb.addInstr(brInstr);
                 //curbb.setTerminator(brInstr);
@@ -947,20 +1013,20 @@ public class IRgenerator {
             //befBB.setTerminator(brInstr);
             func.addBlock(curbb);
             curbb = trueBB;
-            trueBB.setName((++reg_num)+"");
+            trueBB.setName((++reg_num) + "");
             visitStmt(ifStmt.getStmt(), func);// trueBB遍历
-            nextBB = new BasicBlock( "", func);
-            BrInstr true2next = new BrInstr(trueBB, nextBB);
-            trueBB.addInstr(true2next);
-            trueBB.setTerminator(true2next);
-            func.addBlock(trueBB);
+            nextBB = new BasicBlock("", func);
+            BrInstr true2next = new BrInstr(curbb, nextBB);
+            curbb.addInstr(true2next);
+            curbb.setTerminator(true2next);
+            func.addBlock(curbb);
             curbb = falseBB; // falseBB遍历
             falseBB.setName((++reg_num) + "");
             visitStmt(ifStmt.getElseStmt(), func);
-            BrInstr false2next = new BrInstr(falseBB, nextBB);
-            falseBB.addInstr(false2next);
-            falseBB.setTerminator(false2next);
-            func.addBlock(falseBB);
+            BrInstr false2next = new BrInstr(curbb, nextBB);
+            curbb.addInstr(false2next);
+            curbb.setTerminator(false2next);
+            func.addBlock(curbb);
         } else {
             nextBB = new BasicBlock("", func);
             visitCond(ifStmt.getCond(), trueBB, nextBB);
@@ -970,15 +1036,16 @@ public class IRgenerator {
             func.addBlock(befBB);*/
             func.addBlock(curbb);
             curbb = trueBB;
-            trueBB.setName((++reg_num)+"");
+            trueBB.setName((++reg_num) + "");
             visitStmt(ifStmt.getStmt(), func);// trueBB遍历
-            BrInstr true2next = new BrInstr(trueBB, nextBB);
-            trueBB.addInstr(true2next);
-            trueBB.setTerminator(true2next);
-            func.addBlock(trueBB);
+            //BrInstr true2next = new BrInstr(trueBB, nextBB);
+            BrInstr true2next = new BrInstr(curbb, nextBB);
+            curbb.addInstr(true2next);
+            curbb.setTerminator(true2next);
+            func.addBlock(curbb);
         }
         curbb = nextBB; // nextBB继续
-        nextBB.setName(""+(++reg_num));
+        nextBB.setName("" + (++reg_num));
     }
 
     private void visitPrintf(Printf printf) {

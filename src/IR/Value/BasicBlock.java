@@ -20,7 +20,9 @@ public class BasicBlock extends Value{
     }
 
     public void addInstr(Instruction instruction) {
-        instructions.add(instruction);
+        if (terminator == null) {
+            instructions.add(instruction);
+        }
     }
 
     public ArrayList<Instruction> getInstructions() {

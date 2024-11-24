@@ -53,7 +53,9 @@ public class Function extends Value {
     }
 
     public void addBlock(BasicBlock block) {
-        blocks.add(block);
+        if (block != getFirstBlock()) {
+            blocks.add(block);
+        }
     }
 
     public boolean isLibFunc() {

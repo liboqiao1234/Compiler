@@ -15,7 +15,11 @@ public class RelExp extends Node {
         this.addExps = addExps;
         this.relOps = relOps;
     }
-    
+
+    public ArrayList<Token> getRelOps() {
+        return relOps;
+    }
+
     public ArrayList<AddExp> getAddExps() {
         return addExps;
     }

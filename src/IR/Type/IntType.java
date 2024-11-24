@@ -10,8 +10,20 @@ public class IntType extends IRType {
 
     private int bits;
 
-    private IntType(int bits) {
+    public IntType(int bits) {
         this.bits = bits;
+    }
+
+    public int getBits() {
+        return bits;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof IntType) {
+            return ((IntType) obj).bits == bits;
+        }
+        return false;
     }
 
     @Override
