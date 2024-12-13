@@ -33,6 +33,10 @@ public class CallInstr extends Instruction {
         }
     }
 
+    public Function getFunction() {
+        return (Function) getArgument(0);
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();

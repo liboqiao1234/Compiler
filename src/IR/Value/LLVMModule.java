@@ -34,6 +34,22 @@ public class LLVMModule {
         this.functions.add(function);
     }
 
+    public ArrayList<Function> getFunctions() {
+        return functions;
+    }
+
+    public ArrayList<GlobalVariable> getGlobalVariables() {
+        return globalVariables;
+    }
+
+    public ArrayList<StringLiteral> getStringLiterals() {
+        return stringLiterals;
+    }
+
+    public ArrayList<Function> getDeclareFunctions() {
+        return declareFunctions;
+    }
+
     public String toString() {
         StringBuilder sb = new StringBuilder();
         for (Function function : declareFunctions) {

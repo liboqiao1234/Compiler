@@ -46,6 +46,10 @@ public class IRgenerator {
 
     }
 
+    public LLVMModule getModule() {
+        return module;
+    }
+
     private void createSonTable() {
         curSymTable = curSymTable.createSon();
         constSymTable = constSymTable.createSon();
@@ -94,7 +98,7 @@ public class IRgenerator {
         }
         // func call : para is array[]
         if (type.isPointer() && value.getType().isPointer() && ((PointerType) value.getType()).getPointeeType().isArray()) {
-            System.out.println("func call : para is array[]");
+            //System.out.println("func call : para is array[]");
             GetelementptrInstr ptrInstr = new GetelementptrInstr("%" + (++reg_num), value, new ConstInt(0), curbb);
             curbb.addInstr(ptrInstr);
             return ptrInstr;

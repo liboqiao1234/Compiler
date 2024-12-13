@@ -8,6 +8,18 @@ import IR.Value.Value;
 public class IcmpInstr extends Instruction {
     // %4 = icmp eq i32 %3, 0 返回值是I1
     Operator cmp;
+    //            case "==":
+    //                return Operator.eq;
+    //            case "!=":
+    //                return Operator.ne;
+    //            case ">":
+    //                return Operator.sgt;
+    //            case ">=":
+    //                return Operator.sge;
+    //            case "<":
+    //                return Operator.slt;
+    //            case "<=":
+    //                return Operator.sle;
 
     public IcmpInstr(Operator cmp, String name, Value left, Value right, BasicBlock bb) {
         super(IntType.I1, Operator.ICMP, bb, name);

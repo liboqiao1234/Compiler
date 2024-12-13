@@ -1,6 +1,9 @@
 import AST.Nodes.CompUnit;
 import AST.Nodes.ConstExp;
 import IR.IRgenerator;
+import IR.Value.LLVMModule;
+import MIPS.MipsGenerator;
+import MIPS.MipsModule;
 import MyError.MyError;
 import MyFrontEnd.Lexer;
 import MyFrontEnd.Parser;
@@ -66,32 +69,8 @@ public class Compiler {
         CompUnit root = parser.parseCompUnit();
         errors.addAll(parser.getErrors());
         Collections.sort(errors);
-        // if (root != null) root.print();
-        
-        /*if (errors.isEmpty()) {
-            try {
-                PrintStream out = new PrintStream(new FileOutputStream("parser.txt"));
-                
-                System.setOut(out);
-                if (root != null) {
-                    root.print();
-                }
-                out.close();
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }
-        } else {
-            try {
-                PrintStream out = new PrintStream(new FileOutputStream("error.txt"));
-                
-                System.setOut(out);
-                for (MyError error : errors)
-                    System.out.println(error.toString());
-                out.close();
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }
-        }*/
+
+
         Semanticer sm = new Semanticer(root);
         debugOutput("symbol.txt");
         debugOutput("error.txt");
@@ -126,7 +105,7 @@ public class Compiler {
         IRgenerator iRgenerator = IRgenerator.getInstance();
         iRgenerator.generateIR(root);
         String LLVM_IR = iRgenerator.output();
-
+        LLVMModule module = iRgenerator.getModule();
         try {
             PrintStream out = new PrintStream(new FileOutputStream("llvm_ir.txt"));
             System.setOut(out);
@@ -135,6 +114,18 @@ public class Compiler {
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
+
+        MipsGenerator mipsGenerator = new MipsGenerator(module);
+        mipsGenerator.generate();
+        try {
+            PrintStream out = new PrintStream(new FileOutputStream("mips.txt"));
+            System.setOut(out);
+            System.out.println(MipsModule.getInstance().toString());
+            out.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        
         /*
         
         1. TokenType增加，Lexer中保留字字典增加，

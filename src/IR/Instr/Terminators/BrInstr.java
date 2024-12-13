@@ -30,6 +30,22 @@ public class BrInstr extends Instruction {
         this.ifFalse = ifFalse;
     }
 
+    public Value getCond() {
+        return cond;
+    }
+
+    public BasicBlock getNext() {
+        return next;
+    }
+
+    public BasicBlock getIfTrue() {
+        return ifTrue;
+    }
+
+    public BasicBlock getIfFalse() {
+        return ifFalse;
+    }
+
     public String toString() {
         if (cond == null) {
             return "br label %" + next.getName();
