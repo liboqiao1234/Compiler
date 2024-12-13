@@ -271,6 +271,14 @@ public class IRgenerator {
                         curbb.addInstr(ptr);
                         curbb.addInstr(storeInstr);
                     }
+                    if (initVals.size() != size && type.equals(IntType.I8)) {
+                        for (int i = initVals.size(); i < size; i++) {
+                            GetelementptrInstr ptr = new GetelementptrInstr("%" + (++reg_num), alloca, new ConstInt(i), curbb);
+                            StoreInstr storeInstr = new StoreInstr(new ConstInt(0, IntType.I8), ptr, curbb);
+                            curbb.addInstr(ptr);
+                            curbb.addInstr(storeInstr);
+                        }
+                    }
 //                    dflaskj;
                 }
             } else {

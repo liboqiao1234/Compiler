@@ -48,6 +48,7 @@ import java.util.HashMap;
 public class MipsGenerator {
     private LLVMModule module;
     private MipsModule mipsModule = MipsModule.getInstance();
+    private String curFuncName = "";
     private int stackOffset = 0; // means the current offset in a stack frame, set to 0 when entering a function
     private HashMap<String, Integer> stackOffsetMap = new HashMap<>(); // key: name of value; value: offset in stack frame
 
@@ -83,10 +84,12 @@ public class MipsGenerator {
             generateStringLiteral(sl);
         }
         mipsModule.addText(new J("jal", "BB_main"));
+
         mipsModule.addText(new J("j", "BB_exit"));
 
         for (Function func : module.getFunctions()) {
             if (func.isLibFunc()) continue;
+            curFuncName = func.getName().substring(1);
             generateFunction(func);
         }
 
@@ -116,7 +119,7 @@ public class MipsGenerator {
         ArrayList<BasicBlock> basicBlocks = func.getBlocks();
         for (int i = 0; i < basicBlocks.size(); i++) {
             if (i != 0) {
-                mipsModule.addText(new Label(basicBlocks.get(i).getName()));
+                mipsModule.addText(new Label(basicBlocks.get(i).getName()+"_"+func.getName().substring(1)));
             }
             generateBasicBlock(basicBlocks.get(i));
         }
@@ -147,10 +150,10 @@ public class MipsGenerator {
 
         switch (instr.getOp()) {
             case add:
-                mipsModule.addText(new MipsCalc("add", "$t0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("addu", "$t0", "$k0", "$k1"));
                 break;
             case sub:
-                mipsModule.addText(new MipsCalc("sub", "$t0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("subu", "$t0", "$k0", "$k1"));
                 break;
             case mul:
                 mipsModule.addText(new MD("mult", "$k0", "$k1"));
@@ -184,10 +187,10 @@ public class MipsGenerator {
 //                int offset = stackOffsetMap.get(instr.getCond().getName());
 //                mipsModule.addText(new Lw("$k0", "$sp", offset));
             }
-            mipsModule.addText(new B("bne", "BB_" + instr.getIfTrue().getName(), "$k0", "$0"));
-            mipsModule.addText(new J("j", "BB_" + instr.getIfFalse().getName()));
+            mipsModule.addText(new B("bne", "BB_" + instr.getIfTrue().getName()+"_"+curFuncName, "$k0", "$0"));
+            mipsModule.addText(new J("j", "BB_"+ instr.getIfFalse().getName() +"_"+curFuncName));
         } else {
-            mipsModule.addText(new J("j", "BB_" + instr.getNext().getName()));
+            mipsModule.addText(new J("j", "BB_" + instr.getNext().getName() +"_"+curFuncName));
         }
     }
 
@@ -201,7 +204,7 @@ public class MipsGenerator {
             stackOffset -= 4;
         }
 
-        mipsModule.addText(new MipsCalc("addi","$k0","$sp", stackOffset));
+        mipsModule.addText(new MipsCalc("addiu","$k0","$sp", stackOffset));
         // 现在的stackoffset是分配出来空间的地址，也应该是（alloca变量）指针里面存的值
         stackOffset -= 4;
         mipsModule.addText(new Sw("$k0","$sp",stackOffset));
@@ -238,8 +241,10 @@ public class MipsGenerator {
         if (instr.getArgument(0) instanceof ConstInt) {
             mipsModule.addText(new Li("$v0", ((ConstInt) instr.getArgument(0)).getValue()));
         } else {
-            int offset = stackOffsetMap.get(instr.getArgument(0).getName());
-            mipsModule.addText(new Lw("$v0", "$sp", offset));
+            if (!instr.getArguments().isEmpty()){
+                int offset = stackOffsetMap.get(instr.getArgument(0).getName());
+                mipsModule.addText(new Lw("$v0", "$sp", offset));
+            }
         }
         mipsModule.addText(new J("jr", "$ra"));
     }
@@ -283,7 +288,7 @@ public class MipsGenerator {
                     } else {
                         // 局部变量
                         int offset = stackOffsetMap.get(instr.getArgument(1).getName());
-                        mipsModule.addText(new MipsCalc("addi","$k0", "$sp", offset));
+                        mipsModule.addText(new MipsCalc("addiu","$k0", "$sp", offset));
                         mipsModule.addText(new Lw("$a0", "$k0", 0));
                     }
                     mipsModule.addText(new Li("$v0", 4));
@@ -320,7 +325,7 @@ public class MipsGenerator {
         // 设置函数栈
         mipsModule.addText(new Sw("$sp", "$sp", stackOffset - 4));// 先存sp，再存ra
         mipsModule.addText(new Sw("$ra", "$sp", stackOffset - 8));
-        mipsModule.addText(new MipsCalc("addi", "$sp", "$sp", stackOffset-8));
+        mipsModule.addText(new MipsCalc("addiu", "$sp", "$sp", stackOffset-8));
 
         // TODO: 函数调用的跳转j指令会自动设置 $ra 和 $sp吗？
 
@@ -357,7 +362,7 @@ public class MipsGenerator {
 //        }
 
         if (instr.getArgument(1) instanceof ConstInt) {
-            mipsModule.addText(new MipsCalc("addi", "$k0", "$k0", ((ConstInt) instr.getArgument(1)).getValue()));
+            mipsModule.addText(new MipsCalc("addiu", "$k0", "$k0", ((ConstInt) instr.getArgument(1)).getValue()*4));
         } else {
             loadVar(instr.getArgument(1), "$k1");
 //            int offset = stackOffsetMap.get(instr.getArgument(1).getName());
@@ -366,13 +371,18 @@ public class MipsGenerator {
             IRType type = instr.getType();
             System.out.println(type);
             if (type.equals(IntType.I32)) {
-                mipsModule.addText(new MipsCalc("sll", "$k1", "$k1", 2));
+                System.err.println("error: type not supported");
+                //mipsModule.addText(new MipsCalc("sll", "$k1", "$k1", 2));
             } else if (type.equals(IntType.I8)) {
-                mipsModule.addText(new MipsCalc("sll", "$k1", "$k1", 2)); // TODO: check
+                System.err.println("error: type not supported");
+                //mipsModule.addText(new MipsCalc("sll", "$k1", "$k1", 2)); // TODO: check
+            } else if (type.isPointer()){
+                mipsModule.addText(new MipsCalc("sllu", "$k1", "$k1", 2));
+                //System.err.println("error: type not supported");
             } else {
                 System.err.println("error: type not supported");
             }
-            mipsModule.addText(new MipsCalc("add", "$k0", "$k0", "$k1"));
+            mipsModule.addText(new MipsCalc("addu", "$k0", "$k0", "$k1"));
         }
         stackOffset -= 4;
         stackOffsetMap.put(instr.getName(), stackOffset);
@@ -427,11 +437,26 @@ public class MipsGenerator {
 
     private void generateTruncInstr(TruncInstr instr) {
         //  %5 = trunc i32 %4 to i16 暂时都用4位存，不需要浪费指令，直接加表即可？
-        stackOffsetMap.put(instr.getName(), stackOffsetMap.get(instr.getArgument(0).getName()));
+        if (instr.getArgument(0) instanceof ConstInt) {
+            mipsModule.addText(new Li("$k0", ((ConstInt) instr.getArgument(0)).getValue()));
+            stackOffset-=4;
+            stackOffsetMap.put(instr.getName(), stackOffset);
+            mipsModule.addText(new Sw("$k0", "$sp", stackOffset));
+        } else {
+            stackOffsetMap.put(instr.getName(), stackOffsetMap.get(instr.getArgument(0).getName()));
+        }
     }
 
     private void generateZextInstr(ZextInstr instr) {
-        stackOffsetMap.put(instr.getName(), stackOffsetMap.get(instr.getArgument(0).getName()));
+        if (instr.getArgument(0) instanceof ConstInt) {
+            mipsModule.addText(new Li("$k0", ((ConstInt) instr.getArgument(0)).getValue()));
+            stackOffset-=4;
+            stackOffsetMap.put(instr.getName(), stackOffset);
+            mipsModule.addText(new Sw("$k0", "$sp", stackOffset));
+        } else {
+
+            stackOffsetMap.put(instr.getName(), stackOffsetMap.get(instr.getArgument(0).getName()));
+        }
     }
 
     private void translateInstr(Instruction instr) {
@@ -485,11 +510,11 @@ public class MipsGenerator {
         } else if (realType.isI8()) {
             // byte
             assert (initVal instanceof ConstInt);// TODO: delete
-            gvInstr = new GlobalVarInstr(name, ((ConstInt) initVal).getValue(), "byte");
+            gvInstr = new GlobalVarInstr(name, ((ConstInt) initVal).getValue(), "word");
         } else if (realType.isArray()) {
             // ConstArr || ZeroInit
             int len = ((ArrayType) realType).getLength();
-            String type = ((ArrayType) realType).getElementType().isI32() ? "word" : "byte";
+            String type = ((ArrayType) realType).getElementType().isI32() ? "word" : "word";
             // TODO: checkType
 
             if (initVal instanceof Zeroinitializer) {
