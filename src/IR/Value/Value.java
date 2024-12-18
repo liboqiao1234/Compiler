@@ -25,7 +25,18 @@ public class Value {
     }
 
     public ArrayList<Use> getUseList() {
-        return useList;
+        return useList;// 所有对当前Value的use情况
+    }
+
+    public void replaceLoadValue(Value oldValue, Value newValue) {
+        // 其实oldValue就是this，因为load语句返回值就是本身Value
+        for (Use use : useList) {
+            // 根据use找到User，然后把user语句中的loadValue替换成新的Value
+            Instruction instr =(Instruction) use.getUser();
+            instr.replaceArgument(oldValue, newValue);
+            newValue.addUse(use.getUser());
+        }
+
     }
 
     public void updateType(IRType type) {

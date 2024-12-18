@@ -118,7 +118,7 @@ public class Function extends Value {
             }
         }
 
-        for (int i = 2; i < blocks.size(); i++) {
+        for (int i = 2; i <= blocks.size(); i++) {
             BasicBlock now = blockMap.get(i);
             for (BasicBlock block : dom.get(now)) {
                 HashSet<BasicBlock> tmp = new HashSet<>(dom.get(now));
@@ -126,6 +126,7 @@ public class Function extends Value {
                 if (tmp.size() == 1 && tmp.contains(now)) {
                     now.setiDomParent(block);
                     block.addiDomChild(now);
+//                    System.err.println(block.getName()+" iDom: " + now.getName());
                     break;
                 }
             }

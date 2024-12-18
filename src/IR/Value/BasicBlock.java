@@ -18,7 +18,7 @@ public class BasicBlock extends Value {
     private ArrayList<BasicBlock> iDomChildren = new ArrayList<>();
     private ArrayList<BasicBlock> domFrontier = new ArrayList<>();
 
-    public void setiDomParent (BasicBlock iDomParent) {
+    public void setiDomParent(BasicBlock iDomParent) {
         this.iDomParent = iDomParent;
     }
 
@@ -49,7 +49,7 @@ public class BasicBlock extends Value {
     }
 
     public BasicBlock(Function function) {
-        super("firstBlock", new BlockType()); // name:  "reg_num:"
+        super("firstBlock_" + function.getName().substring(1), new BlockType()); // name:  "reg_num:"
         this.function = function;
     }
 
@@ -123,9 +123,9 @@ public class BasicBlock extends Value {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        if (!getName().equals("firstBlock")) {
-            sb.append(getName() + ":\n");
-        }
+//        if (!getName().equals("firstBlock")) {
+        sb.append(getName() + ":\n");
+//        }
         for (Instruction instruction : instructions) {
             sb.append("    ").append(instruction.toString()).append("\n");
         }

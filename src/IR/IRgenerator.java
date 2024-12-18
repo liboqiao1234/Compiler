@@ -735,7 +735,7 @@ public class IRgenerator {
 
 
     private void visitMainFuncDef(MainFuncDef mainFuncDef) {
-        reg_num = 0;
+        reg_num = -1;
         IRType retType = IntType.I32;
         String funcName = "@main";
         Function func = new Function(funcName, retType);
@@ -768,9 +768,9 @@ public class IRgenerator {
                 }
                 paramTypes.add(tmpType);
             }
-            reg_num = paramTypes.size();
+            reg_num = paramTypes.size() -1;
         } else {
-            reg_num = 0;
+            reg_num = -1;
         }
 
         FuncType funcType = funcDef.getFuncType();

@@ -27,6 +27,14 @@ public class Instruction extends User {
         arguments.add(arg);
     }
 
+    public void replaceArgument(Value oldValue, Value newValue) {
+        for (int i = 0; i < arguments.size(); i++) {
+            if (arguments.get(i) == oldValue) {
+                arguments.set(i, newValue);
+            }
+        }
+    }
+
     public Operator getOp() {
         return op;
     }
