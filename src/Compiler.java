@@ -10,6 +10,7 @@ import MyFrontEnd.Parser;
 import MyFrontEnd.Semanticer;
 import MyToken.Token;
 import MyToken.TokenType;
+import Optimization.Optimizer;
 import Symbol.Symbol;
 import Symbol.SymbolTable;
 
@@ -26,6 +27,8 @@ import java.util.Collections;
 import java.util.HashMap;
 
 public class Compiler {
+    private static boolean Optimize = true;
+
     private static void debugOutput(String name) {
         try {
             PrintStream out = new PrintStream(new FileOutputStream(name));
@@ -36,7 +39,7 @@ public class Compiler {
             e.printStackTrace();
         }
     }
-    
+
     public static void main(String[] args) {
         StringBuilder source = new StringBuilder();
         try (FileInputStream fis = new FileInputStream("testfile.txt");
@@ -64,7 +67,7 @@ public class Compiler {
         } else {
             errors = lexer.getErrors();
         }
-        
+
         Parser parser = new Parser(lexer.getTokens());
         CompUnit root = parser.parseCompUnit();
         errors.addAll(parser.getErrors());
@@ -104,8 +107,13 @@ public class Compiler {
 
         IRgenerator iRgenerator = IRgenerator.getInstance();
         iRgenerator.generateIR(root);
-        String LLVM_IR = iRgenerator.output();
+
         LLVMModule module = iRgenerator.getModule();
+        if (Optimize) {
+            Optimizer optimizer = new Optimizer(module);
+            optimizer.optimize();
+        }
+        String LLVM_IR = iRgenerator.output();
         try {
             PrintStream out = new PrintStream(new FileOutputStream("llvm_ir.txt"));
             System.setOut(out);

@@ -377,7 +377,7 @@ public class MipsGenerator {
                 System.err.println("error: type not supported");
                 //mipsModule.addText(new MipsCalc("sll", "$k1", "$k1", 2)); // TODO: check
             } else if (type.isPointer()){
-                mipsModule.addText(new MipsCalc("sllu", "$k1", "$k1", 2));
+                mipsModule.addText(new MipsCalc("sll", "$k1", "$k1", 2));
                 //System.err.println("error: type not supported");
             } else {
                 System.err.println("error: type not supported");
