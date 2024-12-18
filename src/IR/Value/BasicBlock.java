@@ -6,6 +6,7 @@ import IR.Type.BlockType;
 import MIPS.Instr.J;
 
 import java.util.ArrayList;
+import java.util.ListIterator;
 
 public class BasicBlock extends Value {
     private ArrayList<Instruction> instructions = new ArrayList<>();
@@ -14,9 +15,27 @@ public class BasicBlock extends Value {
     private ArrayList<BasicBlock> predecessors = new ArrayList<>();
     private ArrayList<BasicBlock> successors = new ArrayList<>();
     private BasicBlock iDomParent;
+    private ArrayList<BasicBlock> iDomChildren = new ArrayList<>();
+    private ArrayList<BasicBlock> domFrontier = new ArrayList<>();
 
     public void setiDomParent (BasicBlock iDomParent) {
         this.iDomParent = iDomParent;
+    }
+
+    public ArrayList<BasicBlock> getiDomChildren() {
+        return iDomChildren;
+    }
+
+    public ArrayList<BasicBlock> getDomFrontier() {
+        return domFrontier;
+    }
+
+    public void addDomFrontier(BasicBlock domFrontier) {
+        this.domFrontier.add(domFrontier);
+    }
+
+    public void addiDomChild(BasicBlock iDomChild) {
+        iDomChildren.add(iDomChild);
     }
 
     public BasicBlock getiDomParent() {
@@ -32,6 +51,10 @@ public class BasicBlock extends Value {
     public BasicBlock(Function function) {
         super("firstBlock", new BlockType()); // name:  "reg_num:"
         this.function = function;
+    }
+
+    public void addFirst(Instruction instruction) {
+        instructions.add(0, instruction);
     }
 
     public boolean addInstr(Instruction instruction) {

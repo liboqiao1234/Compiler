@@ -13,13 +13,6 @@ public class User extends Value {
         super(name, type);
     }
 
-    public void addUse(Value use) {
-        useList.add(use);
-    }
-
-    public ArrayList<Value> getUseList() {
-        return useList;
-    }
 
 
 }

@@ -9,14 +9,23 @@ public class Value {
     private IRType type;
     private String name;
     private int id;
-    private ArrayList<User> userList;
+    private ArrayList<Use> useList;
+
     private static int idCounter = 0;
 
     public Value (String nameIR, IRType type) {
         this.type = type;
         this.name = nameIR;
         this.id = idCounter++;
-        this.userList = new ArrayList<>();
+        this.useList = new ArrayList<>();
+    }
+
+    public void addUse(User user) {
+        useList.add(new Use(user, this));
+    }
+
+    public ArrayList<Use> getUseList() {
+        return useList;
     }
 
     public void updateType(IRType type) {
@@ -37,10 +46,6 @@ public class Value {
 
     public IRType getType() {
         return type;
-    }
-
-    public ArrayList<User> getUserList() {
-        return userList;
     }
 
     @Override

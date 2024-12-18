@@ -1,6 +1,7 @@
 package IR.Value;
 
 import AST.Nodes.Block;
+import IR.Instr.AllocaInstr;
 import IR.Type.ArrayType;
 import IR.Type.FunctionType;
 import IR.Type.IRType;
@@ -23,6 +24,7 @@ public class Function extends Value {
     private HashMap<Integer, BasicBlock> blockMap = new HashMap<>();
     private HashMap<BasicBlock, Boolean> visited = new HashMap<>();
     private HashMap<BasicBlock, HashSet<BasicBlock>> dom = new HashMap<>();
+    private HashMap<BasicBlock, HashSet<BasicBlock>> sub = new HashMap<>();
 
     private void visitBlocks(BasicBlock now) {
         visited.put(now, true);
@@ -65,21 +67,7 @@ public class Function extends Value {
     }
 
     public void buildDom() {
-        // 删除不可达和空
-        //blocks = blocks.stream().filter(block -> !block.getInstructions().isEmpty()).collect(Collectors.toCollection(ArrayList::new));
-        deleteUnreachableAndEmpty();
-        // 需要重新构造一次前缀后缀
-//        for (BasicBlock block : blocks) {
-//            if (!visited.get(block)) {
-//                //blocks.remove(block);
-//                System.err.println("remove unreachable " + block.getName());
-//            }
-//        }
-
-
-
-        //TODO: check
-
+        deleteUnreachableAndEmpty(); // 删除不可达&空
         // 构造逆后续
         dfsCounter = blocks.size();
         for (BasicBlock block : blocks) {
@@ -109,8 +97,6 @@ public class Function extends Value {
                 }
                 HashSet<BasicBlock> newDom = new HashSet<>(blocks);
                 for (BasicBlock block : now.getPredecessors()) {
-//                    System.err.println(block.getName()+":");
-//                    System.err.println(dom.get(block));
                     newDom.retainAll(dom.get(block));
                 }
                 newDom.add(now);
@@ -125,16 +111,36 @@ public class Function extends Value {
                 }
             }
         }
+        for (BasicBlock block : blocks) {
+            sub.put(block, new HashSet<>());
+            for (BasicBlock domed: dom.get(block)) {
+                sub.get(domed).add(block);
+            }
+        }
 
         for (int i = 2; i < blocks.size(); i++) {
             BasicBlock now = blockMap.get(i);
             for (BasicBlock block : dom.get(now)) {
                 HashSet<BasicBlock> tmp = new HashSet<>(dom.get(now));
-                tmp.removeAll(dom.get(block));// TODO:逻辑不对
+                tmp.removeAll(dom.get(block));
                 if (tmp.size() == 1 && tmp.contains(now)) {
                     now.setiDomParent(block);
+                    block.addiDomChild(now);
                     break;
                 }
+            }
+        }
+
+        // 支配边界，DF
+        for (BasicBlock block : blocks) {//被求
+            for (BasicBlock domed : sub.get(block)){//支配点，看他们的儿子还能在不在被支配的里面
+                for (BasicBlock child : domed.getSuccessors()) {
+                    if (!sub.get(block).contains(child)) {
+                        block.addDomFrontier(child);
+//                        System.err.println(child.getName()+ " in "+block.getName() +"'s DF");
+                    }
+                }
+
             }
         }
 

@@ -23,11 +23,16 @@ public class Instruction extends User {
     }
 
     public void addArgument(Value arg) {
+        arg.addUse(this);
         arguments.add(arg);
     }
 
     public Operator getOp() {
         return op;
+    }
+
+     public BasicBlock getParentBB() {
+        return parentBlock;
     }
 
     public ArrayList<Value> getArguments() {
