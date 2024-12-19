@@ -122,9 +122,9 @@ public class Compiler {
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
-        if (true) {
-            return ;
-        }
+//        if (true) {
+//            return ;
+//        }
         MipsGenerator mipsGenerator = new MipsGenerator(module);
         mipsGenerator.generate();
         try {

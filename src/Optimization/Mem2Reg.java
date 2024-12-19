@@ -44,6 +44,9 @@ public class Mem2Reg {
 
     private void doRemove() {
         for (Instruction instr : waitForRemove) {
+            for (Value arg: instr.getArguments()) {
+                arg.removeUse(instr);
+            }
             instr.getParentBB().getInstructions().remove(instr);
         }
         waitForRemove.clear();

@@ -11,6 +11,7 @@ import IR.Instr.Terminators.ReturnInstr;
 import IR.Instr.TruncInstr;
 import IR.Instr.ZextInstr;
 import IR.Value.BasicBlock;
+import IR.Value.ConstInt;
 import IR.Value.Function;
 import IR.Value.Instruction;
 import IR.Value.LLVMModule;
@@ -39,7 +40,7 @@ public class Optimizer {
 
     private boolean safeDelete(Instruction instr) {
         if (instr instanceof ReturnInstr || instr instanceof BrInstr) return false;
-        return instr instanceof AllocaInstr||
+        return instr instanceof AllocaInstr ||
                 instr instanceof LoadInstr
                 || instr instanceof PhiInstr || instr instanceof CalcInstr ||
                 instr instanceof ZextInstr || instr instanceof IcmpInstr ||
@@ -90,31 +91,49 @@ public class Optimizer {
         }
     }
 
-    private void removePhiFunc(Function func){
-        for(BasicBlock bb : func.getBlocks()){
-            if (!(bb.getInstructions().get(0) instanceof PhiInstr))continue;
+    private void removePhiFunc(Function func) {
+        for (BasicBlock bb : func.getBlocks()) {
+            if (!(bb.getInstructions().get(0) instanceof PhiInstr)) continue;
 
         }
     }
 
     private void removePhi() {
-        for (Function func: module.getFunctions()) {
+        for (Function func : module.getFunctions()) {
             if (func.isLibFunc()) continue;
             removePhiFunc(func);
         }
     }
+
+    private void constOptimize() {
+        for (Function func : module.getFunctions()) {
+            if (func.isLibFunc()) continue;
+            for (BasicBlock bb : func.getBlocks()) {
+                for (Instruction instr : bb.getInstructions()) {
+                    if (instr instanceof CalcInstr) {
+                        CalcInstr calcInstr = (CalcInstr) instr;
+                        calcInstr.calcOptimize();
+                    }
+                }
+            }
+        }
+    }
+
 
     public void optimize() {
         DeadClear();
         IrNumClear irNumClear = new IrNumClear(module);
         irNumClear.clear();
         buildDom();
-        Mem2Reg mem2Reg = new Mem2Reg(module);
-        mem2Reg.run();
+//        Mem2Reg mem2Reg = new Mem2Reg(module);
+//        mem2Reg.run();
         DeadClear();
         irNumClear.clear();
         buildDom();
-        removePhi();
+        constOptimize();
+        DeadClear();
         irNumClear.clear();
+        //removePhi();
+        //irNumClear.clear();
     }
 }

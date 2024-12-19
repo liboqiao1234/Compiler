@@ -16,4 +16,12 @@ public class J extends MipsInstruction {
         }
         return type + " " + label;
     }
+
+    public String getType() {
+        return type;
+    }
+
+    public String getLabel() {
+        return label;
+    }
 }

@@ -75,6 +75,7 @@ public class MipsGenerator {
     }
 
 
+
     public void generate() {
         for (GlobalVariable gv : module.getGlobalVariables()) {
             generateGV(gv);
@@ -119,6 +120,12 @@ public class MipsGenerator {
         ArrayList<BasicBlock> basicBlocks = func.getBlocks();
         for (int i = 0; i < basicBlocks.size(); i++) {
             if (i != 0) {
+                if (mipsModule.getLast() instanceof J ) {
+                    J jInstr = (J) mipsModule.getLast();
+                    if (jInstr.getType().equals("j") && jInstr.getLabel().equals("BB_"+basicBlocks.get(i).getName()+"_"+funcName)) {
+                        mipsModule.deleteLast();
+                    }
+                }
                 mipsModule.addText(new Label(basicBlocks.get(i).getName()+"_"+func.getName().substring(1)));
             }
             generateBasicBlock(basicBlocks.get(i));

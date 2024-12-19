@@ -14,6 +14,14 @@ public class MipsModule {
 
     }
 
+    public void deleteLast() {
+        text.remove(text.size() - 1);
+    }
+
+    public MipsInstruction getLast() {
+        return text.get(text.size() - 1);
+    }
+
     public static MipsModule getInstance() {
         return instance;
     }
@@ -36,7 +44,7 @@ public class MipsModule {
         sb.append("\n");
         sb.append(".text\n");
         for (MipsInstruction instr : text) {
-            if (!(instr instanceof Label)){
+            if (!(instr instanceof Label)) {
                 // label
                 sb.append("    ");
             }

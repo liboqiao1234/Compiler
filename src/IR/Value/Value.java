@@ -25,6 +25,7 @@ public class Value {
     }
 
     public void removeUse(User user) {
+
         useList.remove(new Use(user, this));
     }
 
@@ -40,7 +41,7 @@ public class Value {
             instr.replaceArgument(oldValue, newValue);
             newValue.addUse(use.getUser());
         }
-
+        useList.clear();
     }
 
     public void updateType(IRType type) {
