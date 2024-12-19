@@ -4,11 +4,11 @@ import IR.Type.IntType;
 
 public class Undefined extends Value{
     public Undefined() {
-        super("undef", IntType.VOID);
+        super("0", IntType.I32);
     }
 
     @Override
     public String toString() {
-        return "undef";
+        return "0";
     }
 }

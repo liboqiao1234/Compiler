@@ -38,6 +38,23 @@ public class BasicBlock extends Value {
         iDomChildren.add(iDomChild);
     }
 
+    public void removePredecessor(BasicBlock bb) {
+        predecessors.remove(bb);
+    }
+
+    public void removeSuccessor(BasicBlock bb) {
+        successors.remove(bb);
+    }
+
+    public void removeSelf() {
+        for(BasicBlock bb : predecessors) {
+            bb.removeSuccessor(this);
+        }
+        for(BasicBlock bb : successors) {
+            bb.removePredecessor(this);
+        }
+    }
+
     public BasicBlock getiDomParent() {
         return iDomParent;
     }

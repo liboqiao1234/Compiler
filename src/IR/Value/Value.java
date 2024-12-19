@@ -24,6 +24,10 @@ public class Value {
         useList.add(new Use(user, this));
     }
 
+    public void removeUse(User user) {
+        useList.remove(new Use(user, this));
+    }
+
     public ArrayList<Use> getUseList() {
         return useList;// 所有对当前Value的use情况
     }

@@ -96,7 +96,8 @@ public class Mem2Reg {
                 //把下面的for改成迭代器遍历
 
                 for (Instruction instr : block.getInstructions()) {
-                    if (instr instanceof AllocaInstr) {
+                    if (instr instanceof AllocaInstr && !(((PointerType)instr.getType()).getPointeeType().isArray()
+                    || ((PointerType)instr.getType()).getPointeeType().isPointer())) {
                         def = new ArrayList<>();
 
                         if (instr.getUseList().isEmpty()) {
@@ -150,6 +151,8 @@ public class Mem2Reg {
             } else if (instr instanceof PhiInstr && waitForInsertPhi.contains(instr)) {//TODO:check this
                 stack.push(instr);
                 stack_push++;
+            } else if (instr instanceof AllocaInstr && instr == nowAlloca ) {
+                preRemove(instr);
             }
         }
 

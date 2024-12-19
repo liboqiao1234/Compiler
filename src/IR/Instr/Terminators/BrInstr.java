@@ -19,6 +19,7 @@ public class BrInstr extends Instruction {
 
     public BrInstr(BasicBlock block, BasicBlock next) {
         super(IntType.VOID, Operator.BR, block);
+        addArgument(next);
         this.next = next;
     }
 
@@ -28,6 +29,9 @@ public class BrInstr extends Instruction {
         this.cond = cond;
         this.ifTrue = ifTrue;
         this.ifFalse = ifFalse;
+        addArgument(cond);
+        addArgument(ifTrue);
+        addArgument(ifFalse);
     }
 
     public Value getCond() {

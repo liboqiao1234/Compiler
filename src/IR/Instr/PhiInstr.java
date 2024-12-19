@@ -25,7 +25,10 @@ public class PhiInstr extends Instruction {
 
     public void addOperands(Value op, BasicBlock bb) {
         this.operands.add(op);
-        op.addUse(this);
+//        op.addUse(this);
+//        bb.addUse(this);
+        addArgument(op);
+        addArgument(bb);
         if (!(op instanceof Instruction)) {
             opBBs.add(bb);
         } else {
@@ -42,17 +45,21 @@ public class PhiInstr extends Instruction {
 
     @Override
     public String toString() {
-        for(Value op: operands){
-            if (op instanceof Undefined) {
-                return "";
-            }
-        }
+//        for(Value op: operands){
+//            if (op instanceof Undefined) {
+//                return "";
+//            }
+//        }
         StringBuilder sb = new StringBuilder();
         sb.append(getName()).append(" = phi ").append(getType()).append(" ");
         for (int i = 0; i < operands.size(); i++) {
             Value op = operands.get(i);
-            sb.append("[").append(op.getName()).append(", ");
-            sb.append("%"+ opBBs.get(i).getName()).append("]");
+            if (op instanceof Undefined) {
+                sb.append("[").append(0).append(", ");
+            } else {
+                sb.append("[").append(op.getName()).append(", ");
+            }
+            sb.append("%" + opBBs.get(i).getName()).append("]");
 //            if (!(op instanceof Instruction)) {
 //                sb.append("null").append("]");
 //            } else {

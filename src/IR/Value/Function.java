@@ -136,7 +136,7 @@ public class Function extends Value {
         for (BasicBlock block : blocks) {//被求
             for (BasicBlock domed : sub.get(block)){//支配点，看他们的儿子还能在不在被支配的里面
                 for (BasicBlock child : domed.getSuccessors()) {
-                    if (!sub.get(block).contains(child)) {
+                    if (!sub.get(block).contains(child) || child == block) {
                         block.addDomFrontier(child);
 //                        System.err.println(child.getName()+ " in "+block.getName() +"'s DF");
                     }
