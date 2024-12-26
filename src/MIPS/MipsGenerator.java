@@ -451,23 +451,23 @@ public class MipsGenerator {
         }
         switch (op) {
             case eq:
-                mipsModule.addText(new MipsCalc("seq", "$t0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("seq", "$k0", "$k0", "$k1"));
                 //TODO: 看起来v0只会在函数调用结束后赋值，占用一下呢？
                 break;
             case ne:
-                mipsModule.addText(new MipsCalc("sne", "$t0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("sne", "$k0", "$k0", "$k1"));
                 break;
             case sge:
-                mipsModule.addText(new MipsCalc("sge", "$t0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("sge", "$k0", "$k0", "$k1"));
                 break;
             case sgt:
-                mipsModule.addText(new MipsCalc("sgt", "$t0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("sgt", "$k0", "$k0", "$k1"));
                 break;
             case sle:
-                mipsModule.addText(new MipsCalc("sle", "$t0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("sle", "$k0", "$k0", "$k1"));
                 break;
             case slt:
-                mipsModule.addText(new MipsCalc("slt", "$t0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("slt", "$k0", "$k0", "$k1"));
                 break;
             default:
                 System.err.println("error: icmp op not supported");
@@ -475,7 +475,7 @@ public class MipsGenerator {
         }
         stackOffset -= 4;
         stackOffsetMap.put(instr.getName(), stackOffset);
-        mipsModule.addText(new Sw("$t0", "$sp", stackOffset));
+        mipsModule.addText(new Sw("$k0", "$sp", stackOffset));
     }
 
     private void generateTruncInstr(TruncInstr instr) {
