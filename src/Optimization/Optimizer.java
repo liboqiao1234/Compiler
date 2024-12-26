@@ -119,7 +119,22 @@ public class Optimizer {
         }
     }
 
-
+    public void optimizeNew1() {
+        DeadClear();
+        IrNumClear irNumClear = new IrNumClear(module);
+        irNumClear.clear();
+        buildDom();
+        Mem2Reg mem2Reg = new Mem2Reg(module);
+        mem2Reg.run();
+        DeadClear();
+        irNumClear.clear();
+        buildDom();
+        constOptimize();
+        DeadClear();
+        irNumClear.clear();
+        removePhi();
+        irNumClear.clear();
+    }
     public void optimize() {
         DeadClear();
         IrNumClear irNumClear = new IrNumClear(module);

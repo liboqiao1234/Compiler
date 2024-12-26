@@ -39,6 +39,7 @@ import MIPS.Instr.Lw;
 import MIPS.Instr.MD;
 import MIPS.Instr.MipsCalc;
 import MIPS.Instr.MipsInstruction;
+import MIPS.Instr.Move;
 import MIPS.Instr.Sw;
 import MIPS.Instr.SyscallInstr;
 
@@ -49,6 +50,7 @@ public class MipsGenerator {
     private LLVMModule module;
     private MipsModule mipsModule = MipsModule.getInstance();
     private String curFuncName = "";
+    private Instruction beforeInstr = null;
     private int stackOffset = 0; // means the current offset in a stack frame, set to 0 when entering a function
     private HashMap<String, Integer> stackOffsetMap = new HashMap<>(); // key: name of value; value: offset in stack frame
 
@@ -74,7 +76,10 @@ public class MipsGenerator {
         return res;
     }
 
-
+    public void generateNew1() {
+        System.err.println("mips generator with Allocator!");
+        generate();
+    }
 
     public void generate() {
         for (GlobalVariable gv : module.getGlobalVariables()) {
@@ -118,23 +123,30 @@ public class MipsGenerator {
         }
 
         ArrayList<BasicBlock> basicBlocks = func.getBlocks();
+//        for (int i = 0; i < basicBlocks.size(); i++) {
+//            if ()
+//        }
+
         for (int i = 0; i < basicBlocks.size(); i++) {
             if (i != 0) {
-                if (mipsModule.getLast() instanceof J ) {
+                //每次到下一个BB时候判断，窥孔优化掉j
+                if (mipsModule.getLast() instanceof J) {
                     J jInstr = (J) mipsModule.getLast();
-                    if (jInstr.getType().equals("j") && jInstr.getLabel().equals("BB_"+basicBlocks.get(i).getName()+"_"+funcName)) {
+                    if (jInstr.getType().equals("j") && jInstr.getLabel().equals("BB_" + basicBlocks.get(i).getName() + "_" + funcName)) {
                         mipsModule.deleteLast();
                     }
                 }
-                mipsModule.addText(new Label(basicBlocks.get(i).getName()+"_"+func.getName().substring(1)));
+                mipsModule.addText(new Label(basicBlocks.get(i).getName() + "_" + func.getName().substring(1)));
             }
             generateBasicBlock(basicBlocks.get(i));
         }
     }
 
     private void generateBasicBlock(BasicBlock bb) {
-        for (Instruction instr : bb.getInstructions()) {
+        for (int i = 0; i < bb.getInstructions().size(); i++) {
+            Instruction instr = bb.getInstructions().get(i);
             mipsModule.addText(new Comment(instr.toString()));
+            beforeInstr = i == 0 ? null : bb.getInstructions().get(i - 1);
             translateInstr(instr);
         }
     }
@@ -194,35 +206,46 @@ public class MipsGenerator {
 //                int offset = stackOffsetMap.get(instr.getCond().getName());
 //                mipsModule.addText(new Lw("$k0", "$sp", offset));
             }
-            mipsModule.addText(new B("bne", "BB_" + instr.getIfTrue().getName()+"_"+curFuncName, "$k0", "$0"));
-            mipsModule.addText(new J("j", "BB_"+ instr.getIfFalse().getName() +"_"+curFuncName));
+            mipsModule.addText(new B("bne", "BB_" + instr.getIfTrue().getName() + "_" + curFuncName, "$k0", "$0"));
+            mipsModule.addText(new J("j", "BB_" + instr.getIfFalse().getName() + "_" + curFuncName));
         } else {
-            mipsModule.addText(new J("j", "BB_" + instr.getNext().getName() +"_"+curFuncName));
+            mipsModule.addText(new J("j", "BB_" + instr.getNext().getName() + "_" + curFuncName));
         }
     }
 
     private void generateAllocaInstr(AllocaInstr instr) {
         // Alloca 相当于分配了一个指针，但是后面要是想用一定会store，所以我感觉这里只需要记录offset就可以了？ TODO:check
         // 12.13: 感觉是，alloca分配了一片空间，但是alloca变量本身存的值应该是这个地址
-        IRType type = ((PointerType)instr.getType()).getPointeeType();
+        IRType type = ((PointerType) instr.getType()).getPointeeType();
         if (type instanceof ArrayType) {
             stackOffset -= ((ArrayType) type).getLength() * 4;
         } else {
             stackOffset -= 4;
         }
 
-        mipsModule.addText(new MipsCalc("addiu","$k0","$sp", stackOffset));
+        mipsModule.addText(new MipsCalc("addiu", "$k0", "$sp", stackOffset));
         // 现在的stackoffset是分配出来空间的地址，也应该是（alloca变量）指针里面存的值
         stackOffset -= 4;
-        mipsModule.addText(new Sw("$k0","$sp",stackOffset));
+        mipsModule.addText(new Sw("$k0", "$sp", stackOffset));
         stackOffsetMap.put(instr.getName(), stackOffset);
     }
 
-    private void generateLoadInstr(LoadInstr instr) { // TODO: check global!
-        loadVar(instr.getArgument(0), "$k0");
-//        int offset = stackOffsetMap.get(instr.getArgument(0).getName());
-//        mipsModule.addText(new Lw("$k0", "$sp", offset));// save the address to k0
-        mipsModule.addText(new Lw("$k1", "$k0", 0)); // save the value from address to k1
+    private void generateLoadInstr(LoadInstr instr) {
+        // TODO check new version 窥孔优化掉相邻 store 和 load : give up
+        if (beforeInstr instanceof StoreInstr) {
+            StoreInstr storeInstr = (StoreInstr) beforeInstr;
+            if (storeInstr.getArgument(1).equals(instr.getArgument(0))) {
+                // load 和 store 的地址相同，可以省略load
+//                  System.err.println("[Opt] Store: " + storeInstr.getArgument(1) + " Load:" + instr.getArgument(0));
+            }else {
+                loadVar(instr.getArgument(0), "$k0");
+                mipsModule.addText(new Lw("$k1", "$k0", 0)); // save the value from address to k1
+            }
+        } else {
+            loadVar(instr.getArgument(0), "$k0");
+            mipsModule.addText(new Lw("$k1", "$k0", 0)); // save the value from address to k1
+        }
+
         stackOffset -= 4;
         stackOffsetMap.put(instr.getName(), stackOffset); // TODO: check name!
         mipsModule.addText(new Sw("$k1", "$sp", stackOffset));
@@ -248,7 +271,7 @@ public class MipsGenerator {
         if (instr.getArgument(0) instanceof ConstInt) {
             mipsModule.addText(new Li("$v0", ((ConstInt) instr.getArgument(0)).getValue()));
         } else {
-            if (!instr.getArguments().isEmpty()){
+            if (!instr.getArguments().isEmpty()) {
                 int offset = stackOffsetMap.get(instr.getArgument(0).getName());
                 mipsModule.addText(new Lw("$v0", "$sp", offset));
             }
@@ -267,7 +290,7 @@ public class MipsGenerator {
                     if (instr.getArgument(1) instanceof ConstInt) {
                         mipsModule.addText(new Li("$a0", ((ConstInt) instr.getArgument(1)).getValue()));
                     } else {
-                        loadVar(instr.getArgument(1), "$a0");
+                        loadVar(instr.getArgument(1), "$a0", true);
                     }
                     mipsModule.addText(new Li("$v0", 1));
                     mipsModule.addText(new SyscallInstr(1));
@@ -276,7 +299,7 @@ public class MipsGenerator {
                     if (instr.getArgument(1) instanceof ConstInt) {
                         mipsModule.addText(new Li("$a0", ((ConstInt) instr.getArgument(1)).getValue()));
                     } else {
-                        loadVar(instr.getArgument(1), "$a0");
+                        loadVar(instr.getArgument(1), "$a0", true);
                     }
                     mipsModule.addText(new Li("$v0", 11));
                     mipsModule.addText(new SyscallInstr(11));
@@ -295,7 +318,7 @@ public class MipsGenerator {
                     } else {
                         // 局部变量
                         int offset = stackOffsetMap.get(instr.getArgument(1).getName());
-                        mipsModule.addText(new MipsCalc("addiu","$k0", "$sp", offset));
+                        mipsModule.addText(new MipsCalc("addiu", "$k0", "$sp", offset));
                         mipsModule.addText(new Lw("$a0", "$k0", 0));
                     }
                     mipsModule.addText(new Li("$v0", 4));
@@ -332,14 +355,14 @@ public class MipsGenerator {
         // 设置函数栈
         mipsModule.addText(new Sw("$sp", "$sp", stackOffset - 4));// 先存sp，再存ra
         mipsModule.addText(new Sw("$ra", "$sp", stackOffset - 8));
-        mipsModule.addText(new MipsCalc("addiu", "$sp", "$sp", stackOffset-8));
+        mipsModule.addText(new MipsCalc("addiu", "$sp", "$sp", stackOffset - 8));
 
         // TODO: 函数调用的跳转j指令会自动设置 $ra 和 $sp吗？
 
         mipsModule.addText(new J("jal", "BB_" + instr.getArgument(0).getName().substring(1)));
 
         mipsModule.addText(new Lw("$ra", "$sp", 0));
-        mipsModule.addText(new Lw( "$sp", "$sp", 4)); // TODO: check: lw $sp, 4($sp)
+        mipsModule.addText(new Lw("$sp", "$sp", 4)); // TODO: check: lw $sp, 4($sp)
         if (!instr.getName().isEmpty()) {
             // return value
             stackOffset -= 4;
@@ -349,11 +372,24 @@ public class MipsGenerator {
     }
 
     private void loadVar(Value var, String reg) {
+        loadVar(var, reg, false);
+    }
+
+    private void loadVar(Value var, String reg, boolean hasToDo) {
+        if (!hasToDo && beforeInstr != null && beforeInstr instanceof StoreInstr) {
+            StoreInstr storeInstr = (StoreInstr) beforeInstr;
+            if (storeInstr.getArgument(1).equals(var)) { // pointer === var
+//                System.err.println("[Opt] Store: " + storeInstr.getArgument(1).getName() + " get:" + var.getName());
+                return;
+            }
+        }
+        // get the address of the variable
         if (var instanceof GlobalVariable) {
             mipsModule.addText(new La(reg, var.getName().substring(1)));
         } else if (var instanceof StringLiteral) {
             mipsModule.addText(new La(reg, var.getName().substring(1)));
         } else {
+
             int offset = stackOffsetMap.get(var.getName());
             mipsModule.addText(new Lw(reg, "$sp", offset));
         }
@@ -369,7 +405,7 @@ public class MipsGenerator {
 //        }
 
         if (instr.getArgument(1) instanceof ConstInt) {
-            mipsModule.addText(new MipsCalc("addiu", "$k0", "$k0", ((ConstInt) instr.getArgument(1)).getValue()*4));
+            mipsModule.addText(new MipsCalc("addiu", "$k0", "$k0", ((ConstInt) instr.getArgument(1)).getValue() * 4));
         } else {
             loadVar(instr.getArgument(1), "$k1");
 //            int offset = stackOffsetMap.get(instr.getArgument(1).getName());
@@ -383,7 +419,7 @@ public class MipsGenerator {
             } else if (type.equals(IntType.I8)) {
                 System.err.println("error: type not supported");
                 //mipsModule.addText(new MipsCalc("sll", "$k1", "$k1", 2)); // TODO: check
-            } else if (type.isPointer()){
+            } else if (type.isPointer()) {
                 mipsModule.addText(new MipsCalc("sll", "$k1", "$k1", 2));
                 //System.err.println("error: type not supported");
             } else {
@@ -446,7 +482,7 @@ public class MipsGenerator {
         //  %5 = trunc i32 %4 to i16 暂时都用4位存，不需要浪费指令，直接加表即可？
         if (instr.getArgument(0) instanceof ConstInt) {
             mipsModule.addText(new Li("$k0", ((ConstInt) instr.getArgument(0)).getValue()));
-            stackOffset-=4;
+            stackOffset -= 4;
             stackOffsetMap.put(instr.getName(), stackOffset);
             mipsModule.addText(new Sw("$k0", "$sp", stackOffset));
         } else {
@@ -457,7 +493,7 @@ public class MipsGenerator {
     private void generateZextInstr(ZextInstr instr) {
         if (instr.getArgument(0) instanceof ConstInt) {
             mipsModule.addText(new Li("$k0", ((ConstInt) instr.getArgument(0)).getValue()));
-            stackOffset-=4;
+            stackOffset -= 4;
             stackOffsetMap.put(instr.getName(), stackOffset);
             mipsModule.addText(new Sw("$k0", "$sp", stackOffset));
         } else {

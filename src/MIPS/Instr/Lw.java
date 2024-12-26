@@ -11,6 +11,18 @@ public class Lw extends MipsInstruction{
 
     }
 
+    public String getRt() {
+        return rt;
+    }
+
+    public String getRs() {
+        return rs;
+    }
+
+    public int getOffset() {
+        return offset;
+    }
+
     public String toString(){
         return "lw " + rt + ", " + offset + "(" + rs + ")";
     }

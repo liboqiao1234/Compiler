@@ -27,7 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 
 public class Compiler {
-    private static boolean Optimize = true;
+    private static int Optimize = 1;
 
     private static void debugOutput(String name) {
         try {
@@ -109,9 +109,15 @@ public class Compiler {
         iRgenerator.generateIR(root);
 
         LLVMModule module = iRgenerator.getModule();
-        if (Optimize) {
+        if (Optimize == 1) {
             Optimizer optimizer = new Optimizer(module);
             optimizer.optimize();
+            // ↑ 原版
+            // ↓ 新版
+//            optimizer.optimizeNew1();
+        } else if (Optimize == 2) {
+            Optimizer optimizer = new Optimizer(module);
+            optimizer.optimizeNew1();
         }
         String LLVM_IR = iRgenerator.output();
         try {
@@ -126,7 +132,12 @@ public class Compiler {
 //            return ;
 //        }
         MipsGenerator mipsGenerator = new MipsGenerator(module);
-        mipsGenerator.generate();
+        if (Optimize <= 1) {
+            mipsGenerator.generate();
+        } else if (Optimize == 2) {
+            mipsGenerator.generateNew1();
+        }
+        //mipsGenerator.generate();
         try {
             PrintStream out = new PrintStream(new FileOutputStream("mips.txt"));
             System.setOut(out);

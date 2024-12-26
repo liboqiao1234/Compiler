@@ -11,6 +11,18 @@ public class Sw extends MipsInstruction {
         this.offset = offset;
     }
 
+    public String getRt() {
+        return rt;
+    }
+
+    public String getRs() {
+        return rs;
+    }
+
+    public int getOffset() {
+        return offset;
+    }
+
     public String toString() {
         return "sw " + rt + ", " + offset + "(" + rs + ")";
     }
