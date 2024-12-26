@@ -1,12 +1,9 @@
 package IR.Value;
 
 import IR.Instr.Terminators.BrInstr;
-import IR.Instr.Terminators.ReturnInstr;
 import IR.Type.BlockType;
-import MIPS.Instr.J;
 
 import java.util.ArrayList;
-import java.util.ListIterator;
 
 public class BasicBlock extends Value {
     private ArrayList<Instruction> instructions = new ArrayList<>();
@@ -47,10 +44,10 @@ public class BasicBlock extends Value {
     }
 
     public void removeSelf() {
-        for(BasicBlock bb : predecessors) {
+        for (BasicBlock bb : predecessors) {
             bb.removeSuccessor(this);
         }
-        for(BasicBlock bb : successors) {
+        for (BasicBlock bb : successors) {
             bb.removePredecessor(this);
         }
     }
