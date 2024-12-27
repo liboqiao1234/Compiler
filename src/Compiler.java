@@ -28,6 +28,7 @@ import java.util.HashMap;
 
 public class Compiler {
     private static int Optimize = 1;
+    private static boolean mipsOnReg = true;
 
     private static void debugOutput(String name) {
         try {
@@ -102,7 +103,7 @@ public class Compiler {
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
-
+            return;
         }
 
         IRgenerator iRgenerator = IRgenerator.getInstance();
@@ -132,9 +133,9 @@ public class Compiler {
 //            return ;
 //        }
         MipsGenerator mipsGenerator = new MipsGenerator(module);
-        if (Optimize <= 1) {
+        if (Optimize <= 1 && !mipsOnReg) {
             mipsGenerator.generate();
-        } else if (Optimize == 2) {
+        } else if (Optimize == 2 || mipsOnReg) {
             mipsGenerator.generateNew1();
         }
         //mipsGenerator.generate();

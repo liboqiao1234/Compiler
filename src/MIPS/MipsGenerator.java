@@ -54,9 +54,100 @@ public class MipsGenerator {
     private int stackOffset = 0; // means the current offset in a stack frame, set to 0 when entering a function
     private HashMap<String, Integer> stackOffsetMap = new HashMap<>(); // key: name of value; value: offset in stack frame
 
+    private HashMap<String, Value> regFor = new HashMap<>();// reg存了谁
+    private HashMap<Value, String> varAt = new HashMap<>();// var在哪个Reg
+    private boolean useReg = false;
+
     public MipsGenerator(LLVMModule module) {
         this.module = module;
+        for (int i = 0; i <= 9; i++) {
+            regFor.put("$t" + i, null);
+        }
     }
+
+    private void releaseAllRegister(boolean clear){
+        // 弃用寄存器，不保存
+        if (clear == false){
+            for (int i = 0; i <= 9; i++) {
+                Value v = regFor.get("$t" + i);
+                if (v != null) {
+                    varAt.remove(v);
+                    regFor.put("$t" + i, null);
+                }
+//                regFor.put(reg, null);
+//                varAt.remove(v);
+            }
+        } else{
+            releaseAllRegister();
+        }
+    }
+
+    private void releaseAllRegister() {
+        for (int i = 0; i <= 9; i++) {
+            releaseReg("$t" + i);
+//            Value v = regFor.get("$t" + i);
+//            if (v != null) {
+//                stackOffset -= 4;
+//                stackOffsetMap.put(v.getName(), stackOffset);
+//                mipsModule.addText(new Sw("$t" + i, "$sp", stackOffset));
+//            }
+//            varAt.remove(v);
+//            regFor.put("$t" + i, null);
+        }
+    }
+
+    private void releaseReg(String reg) {
+        // saveToStack
+        Value v = regFor.get(reg);
+        if (v == null) return;
+        if (!stackOffsetMap.containsKey(v.getName())) {
+            stackOffset -= 4;
+            stackOffsetMap.put(v.getName(), stackOffset);
+            mipsModule.addText(new Sw(reg, "$sp", stackOffset));
+            regFor.put(reg, null);
+            varAt.remove(v);
+        } else {
+            int offset = stackOffsetMap.get(v.getName());
+            mipsModule.addText(new Sw(reg, "$sp", offset));
+            regFor.put(reg, null);
+            varAt.remove(v);
+
+        }
+    }
+
+    private int nextFreeNum = 0;
+
+    private String AllocReg(Value v) {
+        if (!useReg) return null;
+        for (int i = 0; i <= 9; i++) {
+            if (regFor.get("$t" + i) == null) {
+                regFor.put("$t" + i, v);
+                varAt.put(v, "$t" + i);
+                return "$t" + i;
+            }
+        }
+
+        //TODO: 按照use释放寄存器
+        String nextFree = "$t" + nextFreeNum;
+        nextFreeNum = (nextFreeNum + 1) % 10;
+        releaseReg(nextFree);
+        regFor.put(nextFree, v);
+        varAt.put(v, nextFree);
+        return nextFree;
+//        return null;
+    }
+
+    private String getValue(Value value) {
+        if (value instanceof ConstInt) {
+            System.err.println("should not be here! imm???");
+            return null;
+        }
+        if (varAt.containsKey(value)) {
+            return varAt.get(value);
+        }
+        return null;
+    }
+
 
     private void clearWhenEnter() {
         stackOffset = 0;
@@ -77,7 +168,8 @@ public class MipsGenerator {
     }
 
     public void generateNew1() {
-        System.err.println("mips generator with Allocator!");
+//        System.err.println("mips generator with Allocator!");
+        useReg = true;
         generate();
     }
 
@@ -137,8 +229,11 @@ public class MipsGenerator {
                     }
                 }
                 mipsModule.addText(new Label(basicBlocks.get(i).getName() + "_" + func.getName().substring(1)));
+
             }
+            releaseAllRegister(false);
             generateBasicBlock(basicBlocks.get(i));
+
         }
     }
 
@@ -153,60 +248,76 @@ public class MipsGenerator {
 
     private void generateCalcInstr(CalcInstr instr) {
         // x = y + z
+        String reg1 = "$k0";
+        String reg2 = "$k1";
         if (instr.getArgument(0) instanceof ConstInt) {
             mipsModule.addText(new Li("$k0", ((ConstInt) instr.getArgument(0)).getValue()));
         } else {
-            int offset = stackOffsetMap.get(instr.getArgument(0).getName());
-            mipsModule.addText(new Lw("$k0", "$sp", offset));
+            if (getValue(instr.getArgument(0)) != null) {
+                reg1 = getValue(instr.getArgument(0));
+            } else {
+                loadVar(instr.getArgument(0), "$k0");
+            }
+//                int offset = stackOffsetMap.get(instr.getArgument(0).getName());
+//                mipsModule.addText(new Lw("$k0", "$sp", offset));
         }
 
         if (instr.getArgument(1) instanceof ConstInt) {
             mipsModule.addText(new Li("$k1", ((ConstInt) instr.getArgument(1)).getValue()));
         } else {
-            int offset = stackOffsetMap.get(instr.getArgument(1).getName());
-            mipsModule.addText(new Lw("$k1", "$sp", offset));
+            if (getValue(instr.getArgument(1)) != null) {
+                reg2 = getValue(instr.getArgument(1));
+            } else {
+                loadVar(instr.getArgument(1), "$k1");
+            }
+//            int offset = stackOffsetMap.get(instr.getArgument(1).getName());
+//            mipsModule.addText(new Lw("$k1", "$sp", offset));
         }
-
+        String reg3 = AllocReg(instr);
+        if (reg3 == null) {
+            reg3 = "$k0";
+        }
         switch (instr.getOp()) {
             case add:
-                mipsModule.addText(new MipsCalc("addu", "$t0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("addu", reg3, reg1, reg2));
                 break;
             case sub:
-                mipsModule.addText(new MipsCalc("subu", "$t0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("subu", reg3, reg1, reg2));
                 break;
             case mul:
-                mipsModule.addText(new MD("mult", "$k0", "$k1"));
-                mipsModule.addText(new HILO("MFLO", "$t0"));
+                mipsModule.addText(new MD("mult", reg1, reg2));
+                mipsModule.addText(new HILO("MFLO", reg3));
                 break;
             case sdiv:
-                mipsModule.addText(new MD("div", "$k0", "$k1"));
-                mipsModule.addText(new HILO("MFLO", "$t0"));
+                mipsModule.addText(new MD("div", reg1, reg2));
+                mipsModule.addText(new HILO("MFLO", reg3));
                 break;
             case srem:
-                mipsModule.addText(new MD("div", "$k0", "$k1"));
-                mipsModule.addText(new HILO("MFHI", "$t0"));
+                mipsModule.addText(new MD("div", reg1, reg2));
+                mipsModule.addText(new HILO("MFHI", reg3));
                 break;
             default:
                 System.err.println("error: unsupported calc instr" + instr.getOp());
                 break;
         }
-        stackOffset -= 4;
-        stackOffsetMap.put(instr.getName(), stackOffset);
-        mipsModule.addText(new Sw("$t0", "$sp", stackOffset));
+        if (reg3.equals("$k0")) {//TODO:check this
+            stackOffset -= 4;
+            stackOffsetMap.put(instr.getName(), stackOffset);
+            mipsModule.addText(new Sw(reg3, "$sp", stackOffset));
+        }
         //mipsModule.addText(new MipsCalc(instr.getOp(),"$k2", "$k0", "$k1"));
     }
 
     private void generateBrInstr(BrInstr instr) {
         if (instr.getCond() != null) {
             // bne
+            String reg = "$k0";
             if (instr.getCond() instanceof ConstInt) {
                 mipsModule.addText(new Li("$k0", ((ConstInt) instr.getCond()).getValue()));
             } else {
-                loadVar(instr.getCond(), "$k0");
-//                int offset = stackOffsetMap.get(instr.getCond().getName());
-//                mipsModule.addText(new Lw("$k0", "$sp", offset));
+                reg = loadVar(instr.getCond(), "$k0");
             }
-            mipsModule.addText(new B("bne", "BB_" + instr.getIfTrue().getName() + "_" + curFuncName, "$k0", "$0"));
+            mipsModule.addText(new B("bne", "BB_" + instr.getIfTrue().getName() + "_" + curFuncName, reg, "$0"));
             mipsModule.addText(new J("j", "BB_" + instr.getIfFalse().getName() + "_" + curFuncName));
         } else {
             mipsModule.addText(new J("j", "BB_" + instr.getNext().getName() + "_" + curFuncName));
@@ -225,6 +336,7 @@ public class MipsGenerator {
 
         mipsModule.addText(new MipsCalc("addiu", "$k0", "$sp", stackOffset));
         // 现在的stackoffset是分配出来空间的地址，也应该是（alloca变量）指针里面存的值
+
         stackOffset -= 4;
         mipsModule.addText(new Sw("$k0", "$sp", stackOffset));
         stackOffsetMap.put(instr.getName(), stackOffset);
@@ -232,37 +344,64 @@ public class MipsGenerator {
 
     private void generateLoadInstr(LoadInstr instr) {
         // TODO check new version 窥孔优化掉相邻 store 和 load : give up
-        if (beforeInstr instanceof StoreInstr) {
-            StoreInstr storeInstr = (StoreInstr) beforeInstr;
-            if (storeInstr.getArgument(1).equals(instr.getArgument(0))) {
-                // load 和 store 的地址相同，可以省略load
-//                  System.err.println("[Opt] Store: " + storeInstr.getArgument(1) + " Load:" + instr.getArgument(0));
-            }else {
-                loadVar(instr.getArgument(0), "$k0");
-                mipsModule.addText(new Lw("$k1", "$k0", 0)); // save the value from address to k1
-            }
-        } else {
-            loadVar(instr.getArgument(0), "$k0");
-            mipsModule.addText(new Lw("$k1", "$k0", 0)); // save the value from address to k1
+        String reg2 = AllocReg(instr);
+        if (reg2 == null) {
+            reg2 = "$k1";
         }
+//        if (beforeInstr instanceof StoreInstr) {
+//            StoreInstr storeInstr = (StoreInstr) beforeInstr;
+//            if (storeInstr.getArgument(1).equals(instr.getArgument(0))) {
+//                // load 和 store 的地址相同，可以省略load
+////                  System.err.println("[Opt] Store: " + storeInstr.getArgument(1) + " Load:" + instr.getArgument(0));
+//            } else {
+//                String reg = "$k0";
+//                if (getValue(instr.getArgument(0)) != null) {
+//                    reg = getValue(instr.getArgument(0));
+//                } else {
+//                    loadVar(instr.getArgument(0), "$k0");
+//                }
+//                mipsModule.addText(new Lw(reg2, reg, 0)); // save the value from address to k1
+//            }
+//        } else {
+        String reg = "$k0";
+        if (getValue(instr.getArgument(0)) != null) {
+            reg = getValue(instr.getArgument(0));
+        } else {
+            reg = "$k0";
+            loadVar(instr.getArgument(0), "$k0");
+        }
+        mipsModule.addText(new Lw(reg2, reg, 0)); // save the value from address to k1
+        //mipsModule.addText(new Move(reg2, reg)); // save the value from address to k1
+//        }
 
-        stackOffset -= 4;
-        stackOffsetMap.put(instr.getName(), stackOffset); // TODO: check name!
-        mipsModule.addText(new Sw("$k1", "$sp", stackOffset));
+        if (reg2.equals("$k1")) {
+            stackOffset -= 4;
+            stackOffsetMap.put(instr.getName(), stackOffset); // TODO: check name!
+            mipsModule.addText(new Sw("$k1", "$sp", stackOffset));
+        }
 
     }
 
     private void generateStoreInstr(StoreInstr instr) {
-        loadVar(instr.getArgument(1), "$k0");
-//        int offset = stackOffsetMap.get(instr.getArgument(1).getName());
-//        mipsModule.addText(new Lw("$k0", "$sp", offset)); // load the address to k0
-        if (instr.getArgument(0) instanceof ConstInt) {
-            mipsModule.addText(new Li("$k1", ((ConstInt) instr.getArgument(0)).getValue()));
+        String reg = "$k0";
+        String reg2 = "$k1";
+        if (getValue(instr.getArgument(1)) != null) {
+            reg = getValue(instr.getArgument(1));
         } else {
-            int offset2 = stackOffsetMap.get(instr.getArgument(0).getName());
-            mipsModule.addText(new Lw("$k1", "$sp", offset2));
+            loadVar(instr.getArgument(1), "$k0");
         }
-        mipsModule.addText(new Sw("$k1", "$k0", 0)); // store the value to address
+        if (instr.getArgument(0) instanceof ConstInt) {
+            mipsModule.addText(new Li(reg2, ((ConstInt) instr.getArgument(0)).getValue()));
+        } else {
+            if (getValue(instr.getArgument(0)) != null) {
+                reg2 = getValue(instr.getArgument(0));
+            } else {
+                loadVar(instr.getArgument(0), "$k1");
+            }
+//            int offset2 = stackOffsetMap.get(instr.getArgument(0).getName());
+//            mipsModule.addText(new Lw("$k1", "$sp", offset2));
+        }
+        mipsModule.addText(new Sw(reg2, reg, 0)); // store the value to address
         // TODO:check
     }
 
@@ -272,8 +411,11 @@ public class MipsGenerator {
             mipsModule.addText(new Li("$v0", ((ConstInt) instr.getArgument(0)).getValue()));
         } else {
             if (!instr.getArguments().isEmpty()) {
-                int offset = stackOffsetMap.get(instr.getArgument(0).getName());
-                mipsModule.addText(new Lw("$v0", "$sp", offset));
+                if (getValue(instr.getArgument(0)) != null) {
+                    mipsModule.addText(new Move("$v0", getValue(instr.getArgument(0))));
+                } else {
+                    loadVar(instr.getArgument(0), "$v0");
+                }
             }
         }
         mipsModule.addText(new J("jr", "$ra"));
@@ -290,7 +432,13 @@ public class MipsGenerator {
                     if (instr.getArgument(1) instanceof ConstInt) {
                         mipsModule.addText(new Li("$a0", ((ConstInt) instr.getArgument(1)).getValue()));
                     } else {
-                        loadVar(instr.getArgument(1), "$a0", true);
+                        String reg = getValue(instr.getArgument(1));
+                        if (reg != null) {
+                            mipsModule.addText(new Move("$a0", reg));// move reg's value to k0
+                        } else {
+                            loadVar(instr.getArgument(1), "$a0");
+                        }
+//                        loadVar(instr.getArgument(1), "$a0");
                     }
                     mipsModule.addText(new Li("$v0", 1));
                     mipsModule.addText(new SyscallInstr(1));
@@ -299,7 +447,12 @@ public class MipsGenerator {
                     if (instr.getArgument(1) instanceof ConstInt) {
                         mipsModule.addText(new Li("$a0", ((ConstInt) instr.getArgument(1)).getValue()));
                     } else {
-                        loadVar(instr.getArgument(1), "$a0", true);
+                        String reg = getValue(instr.getArgument(1));
+                        if (reg != null) {
+                            mipsModule.addText(new Move("$a0", reg));// move reg's value to k0
+                        } else {
+                            loadVar(instr.getArgument(1), "$a0");
+                        }
                     }
                     mipsModule.addText(new Li("$v0", 11));
                     mipsModule.addText(new SyscallInstr(11));
@@ -341,15 +494,20 @@ public class MipsGenerator {
         }
         // CallInstr: arg[0] funcName, arg[1~n]: para
         // 参数压栈
+        releaseAllRegister();
         for (int i = 1; i < instr.getArguments().size(); i++) {
+            String reg = "$k0";
             if (instr.getArguments().get(i) instanceof ConstInt) {
                 mipsModule.addText(new Li("$k0", ((ConstInt) instr.getArguments().get(i)).getValue()));
             } else {
-                int offset = stackOffsetMap.get(instr.getArguments().get(i).getName());
-                mipsModule.addText(new Lw("$k0", "$sp", offset));
+                reg = getValue(instr.getArguments().get(i));
+                if (reg == null) {
+                    reg = "$k0";
+                    loadVar(instr.getArguments().get(i), "$k0");
+                }
             }
             //stackOffset -= 4;
-            mipsModule.addText(new Sw("$k0", "$sp", stackOffset - 8 - 4 * i));
+            mipsModule.addText(new Sw(reg, "$sp", stackOffset - 8 - 4 * i));
             // 这里的8，分别是要保存起来的sp和ra。所以再过了8才是真正函数栈的开始。
         }
         // 设置函数栈
@@ -365,49 +523,63 @@ public class MipsGenerator {
         mipsModule.addText(new Lw("$sp", "$sp", 4)); // TODO: check: lw $sp, 4($sp)
         if (!instr.getName().isEmpty()) {
             // return value
-            stackOffset -= 4;
-            stackOffsetMap.put(instr.getName(), stackOffset);
-            mipsModule.addText(new Sw("$v0", "$sp", stackOffset));
+            String resReg = AllocReg(instr);
+            if (resReg != null) {
+                mipsModule.addText(new Move(resReg, "$v0"));
+            } else {
+                stackOffset -= 4;
+                stackOffsetMap.put(instr.getName(), stackOffset);
+                mipsModule.addText(new Sw("$v0", "$sp", stackOffset));
+            }
         }
     }
 
-    private void loadVar(Value var, String reg) {
-        loadVar(var, reg, false);
-    }
+//    private void loadVar(Value var, String reg) {
+//        loadVar(var, reg, false);
+//    }
 
-    private void loadVar(Value var, String reg, boolean hasToDo) {
-        if (!hasToDo && beforeInstr != null && beforeInstr instanceof StoreInstr) {
+    private String loadVar(Value var, String reg) {
+        if (getValue(var) != null) {
+            return getValue(var);
+        }
+        if (beforeInstr != null && beforeInstr instanceof StoreInstr) {
             StoreInstr storeInstr = (StoreInstr) beforeInstr;
             if (storeInstr.getArgument(1).equals(var)) { // pointer === var
 //                System.err.println("[Opt] Store: " + storeInstr.getArgument(1).getName() + " get:" + var.getName());
-                return;
+                return reg;
             }
         }
-        // get the address of the variable
+        // set var's value into reg
         if (var instanceof GlobalVariable) {
             mipsModule.addText(new La(reg, var.getName().substring(1)));
         } else if (var instanceof StringLiteral) {
             mipsModule.addText(new La(reg, var.getName().substring(1)));
         } else {
-
             int offset = stackOffsetMap.get(var.getName());
             mipsModule.addText(new Lw(reg, "$sp", offset));
         }
+        return reg;
     }
 
     private void generateGetelementptrInstr(GetelementptrInstr instr) {
         // if global!!!
-        loadVar(instr.getArgument(0), "$k0");
-//        if (instr.getArgument(0) instanceof GlobalVariable) {
-//            mipsModule.addText(new La("$k0", instr.getArgument(0).getName()));
-//        }else {
-//            mipsModule.addText(new Lw("$k0", "$sp", stackOffsetMap.get(instr.getArgument(0).getName())));
-//        }
+        String reg = "$k0";
+        if (getValue(instr.getArgument(0)) != null) {
+            reg = getValue(instr.getArgument(0));
+            mipsModule.addText(new Move("$k0", reg));// move reg's value to k0
+        } else {
+            loadVar(instr.getArgument(0), "$k0");
+        }
 
         if (instr.getArgument(1) instanceof ConstInt) {
             mipsModule.addText(new MipsCalc("addiu", "$k0", "$k0", ((ConstInt) instr.getArgument(1)).getValue() * 4));
         } else {
-            loadVar(instr.getArgument(1), "$k1");
+            if (getValue(instr.getArgument(1)) != null) {
+                reg = getValue(instr.getArgument(1));
+                mipsModule.addText(new Move("$k1", reg));// move reg's value to k0
+            } else {
+                loadVar(instr.getArgument(1), "$k1");
+            }
 //            int offset = stackOffsetMap.get(instr.getArgument(1).getName());
 //            // TODO: check type! char may only x1 !!!
 //            mipsModule.addText(new Lw("$k1", "$sp", offset));
@@ -435,6 +607,7 @@ public class MipsGenerator {
     private void generateIcmpInstr(IcmpInstr instr) {
         //  %4 = icmp eq i32 %3, 0
         //
+        String reg1 = "$k0", reg2 = "$k1";
         Operator op = instr.getCmp();
         if (instr.getArgument(0) instanceof ConstInt) {
 //            if (((ConstInt) instr.getArgument(0)).getValue() == 0) {
@@ -442,40 +615,47 @@ public class MipsGenerator {
 //            } //TODO: 常数优化，提前运算
             mipsModule.addText(new Li("$k0", ((ConstInt) instr.getArgument(0)).getValue()));
         } else {
-            mipsModule.addText(new Lw("$k0", "$sp", stackOffsetMap.get(instr.getArgument(0).getName())));
+            reg1 = loadVar(instr.getArgument(0), "$k0");
+            //mipsModule.addText(new Lw("$k0", "$sp", stackOffsetMap.get(instr.getArgument(0).getName())));
         }
         if (instr.getArgument(1) instanceof ConstInt) {
             mipsModule.addText(new Li("$k1", ((ConstInt) instr.getArgument(1)).getValue()));
         } else {
-            mipsModule.addText(new Lw("$k1", "$sp", stackOffsetMap.get(instr.getArgument(1).getName())));
+            reg2 = loadVar(instr.getArgument(1), "$k1");
+            //mipsModule.addText(new Lw("$k1", "$sp", stackOffsetMap.get(instr.getArgument(1).getName())));
+        }
+        String reg3 = AllocReg(instr);
+        if (reg3 == null) {
+            reg3 = "$k0";
         }
         switch (op) {
             case eq:
-                mipsModule.addText(new MipsCalc("seq", "$k0", "$k0", "$k1"));
-                //TODO: 看起来v0只会在函数调用结束后赋值，占用一下呢？
+                mipsModule.addText(new MipsCalc("seq", reg3, reg1, reg2));
                 break;
             case ne:
-                mipsModule.addText(new MipsCalc("sne", "$k0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("sne", reg3, reg1, reg2));
                 break;
             case sge:
-                mipsModule.addText(new MipsCalc("sge", "$k0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("sge", reg3, reg1, reg2));
                 break;
             case sgt:
-                mipsModule.addText(new MipsCalc("sgt", "$k0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("sgt", reg3, reg1, reg2));
                 break;
             case sle:
-                mipsModule.addText(new MipsCalc("sle", "$k0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("sle", reg3, reg1, reg2));
                 break;
             case slt:
-                mipsModule.addText(new MipsCalc("slt", "$k0", "$k0", "$k1"));
+                mipsModule.addText(new MipsCalc("slt", reg3, reg1, reg2));
                 break;
             default:
                 System.err.println("error: icmp op not supported");
                 break;
         }
-        stackOffset -= 4;
-        stackOffsetMap.put(instr.getName(), stackOffset);
-        mipsModule.addText(new Sw("$k0", "$sp", stackOffset));
+        if (reg3.equals("$k0")) {
+            stackOffset -= 4;
+            stackOffsetMap.put(instr.getName(), stackOffset);
+            mipsModule.addText(new Sw("$k0", "$sp", stackOffset));
+        }
     }
 
     private void generateTruncInstr(TruncInstr instr) {
@@ -486,7 +666,11 @@ public class MipsGenerator {
             stackOffsetMap.put(instr.getName(), stackOffset);
             mipsModule.addText(new Sw("$k0", "$sp", stackOffset));
         } else {
-            stackOffsetMap.put(instr.getName(), stackOffsetMap.get(instr.getArgument(0).getName()));
+            if (getValue(instr.getArgument(0)) != null) {
+                varAt.put(instr, getValue(instr.getArgument(0)));
+            } else {
+                stackOffsetMap.put(instr.getName(), stackOffsetMap.get(instr.getArgument(0).getName()));
+            }
         }
     }
 
@@ -497,8 +681,11 @@ public class MipsGenerator {
             stackOffsetMap.put(instr.getName(), stackOffset);
             mipsModule.addText(new Sw("$k0", "$sp", stackOffset));
         } else {
-
-            stackOffsetMap.put(instr.getName(), stackOffsetMap.get(instr.getArgument(0).getName()));
+            if (getValue(instr.getArgument(0)) != null) {
+                varAt.put(instr, getValue(instr.getArgument(0)));
+            } else {
+                stackOffsetMap.put(instr.getName(), stackOffsetMap.get(instr.getArgument(0).getName()));
+            }
         }
     }
 
