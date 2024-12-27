@@ -670,8 +670,10 @@ public class IRgenerator {
         //  LVal → Ident ['[' Exp ']']
         if (isConst) {
             if (lVal.getExp() != null) {
-                System.err.println("Error! Array as lVal in const mode!");
-                return new Value("Error in lVal", new IRType());
+//                System.err.println("Error! Array as lVal in const mode!");
+//                return new Value("Error in lVal", new IRType());
+                ConstArray arr = (ConstArray) constSymTable.find(lVal.getIdent().getContent());
+                return arr.getElements().get(((ConstInt) visitExp(lVal.getExp(), true)).getValue());
             } else {
                 // TODO C&D
                 //System.err.println(needType.toString()+ " " + Convert(constSymTable.find(lVal.getIdent().getContent()), needType, bb));
